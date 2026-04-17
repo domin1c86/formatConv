@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>格式转换工具 - 界面 Mockup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f5f6f7;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .window {
+            width: 1000px;
+            height: 760px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .titlebar {
+            height: 44px;
+            background: #2b2d42;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        /* 左侧控制面板 */
+        .sidebar {
+            width: 280px;
+            background: #fafbfc;
+            border-right: 1px solid #e8e9eb;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .sidebar-footer {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-top: 16px;
+        }
+        .section-title {
+            font-size: 11px;
+            color: #8b8c8f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .btn {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .btn-primary { background: #4f46e5; color: #fff; }
+        .btn-secondary { background: #e8e9eb; color: #333; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-ghost { background: transparent; color: #666; border: 1px solid #ddd; }
+        .btn:hover { opacity: 0.9; }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .input-group label {
+            font-size: 12px;
+            color: #555;
+        }
+        .input-row {
+            display: flex;
+            gap: 8px;
+        }
+        .input-row input, .input-row select {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 12px;
+            background: #fff;
+        }
+        .input-row button {
+            padding: 8px 10px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .sidebar-divider {
+            height: 1px;
+            background: #e8e9eb;
+            margin: 4px 0;
+        }
+
+        /* 右侧内容区 */
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e8e9eb;
+            background: #fff;
+        }
+        .tab {
+            padding: 14px 24px;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+            font-weight: 500;
+        }
+        .task-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e8e9eb;
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-icon {
+            width: 32px;
+            height: 32px;
+            background: #eef2ff;
+            color: #4f46e5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .file-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: #222;
+        }
+        .file-path {
+            font-size: 11px;
+            color: #999;
+        }
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .icon-btn {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .icon-btn.start { background: #10b981; color: #fff; }
+        .icon-btn.delete { background: #fee2e2; color: #ef4444; }
+        .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .format-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: #555;
+        }
+        .format-row select {
+            padding: 5px 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+        }
+        .arrow { color: #aaa; font-size: 12px; }
+        .progress-area {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .progress-bar-bg {
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #4f46e5;
+            border-radius: 3px;
+            width: 65%;
+            transition: width 0.3s;
+        }
+        .progress-text {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .status-waiting { background: #f3f4f6; color: #6b7280; }
+        .status-running { background: #dbeafe; color: #2563eb; }
+        .status-done { background: #d1fae5; color: #059669; }
+
+        /* 设置页面 */
+        .settings-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            display: none;
+        }
+        .settings-panel.active {
+            display: block;
+        }
+        .settings-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 20px;
+        }
+        .settings-section {
+            background: #fafbfc;
+            border: 1px solid #e8e9eb;
+            border-radius: 10px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+        .settings-section h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 14px;
+        }
+        .setting-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .setting-item:last-child { margin-bottom: 0; }
+        .setting-item label {
+            font-size: 13px;
+            color: #555;
+        }
+        .setting-item input[type="text"],
+        .setting-item select {
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 200px;
+        }
+        .setting-item .hint {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
+        }
+        .toggle {
+            width: 42px;
+            height: 22px;
+            background: #ddd;
+            border-radius: 11px;
+            position: relative;
+            cursor: pointer;
+        }
+        .toggle::after {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.2s;
+        }
+        .toggle.active {
+            background: #4f46e5;
+        }
+        .toggle.active::after {
+            left: 22px;
+        }
+        .format-tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .format-tag {
+            padding: 4px 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #555;
+        }
+        .format-tag.add {
+            background: #f3f4f6;
+            color: #666;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="window">
+        <div class="titlebar">格式转换工具</div>
+        <div class="main">
+            <!-- 左侧控制面板 -->
+            <div class="sidebar">
+                <div class="sidebar-content">
+                    <div>
+                        <div class="section-title">文件</div>
+                        <button class="btn btn-primary" style="width:100%">+ 添加文件</button>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="section-title">视频格式设置</div>
+                        <div class="input-row">
+                            <select>
+                                <option selected>保持不变</option>
+                                <option>mkv</option>
+                                <option>mp4</option>
+                                <option>avi</option>
+                                <option>mov</option>
+                            </select>
+                            <button class="btn btn-secondary">应用</button>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="section-title">音频格式设置</div>
+                        <div class="input-row">
+                            <select>
+                                <option selected>保持不变</option>
+                                <option>mp3</option>
+                                <option>wav</option>
+                                <option>flac</option>
+                                <option>aac</option>
+                            </select>
+                            <button class="btn btn-secondary">应用</button>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="section-title">图片格式设置</div>
+                        <div class="input-row">
+                            <select>
+                                <option selected>保持不变</option>
+                                <option>jpg</option>
+                                <option>png</option>
+                                <option>gif</option>
+                                <option>webp</option>
+                            </select>
+                            <button class="btn btn-secondary">应用</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-divider"></div>
+                    <button class="btn btn-success" style="width:100%">启动全部任务</button>
+                    <button class="btn btn-ghost" style="width:100%">设置</button>
+                </div>
+            </div>
+
+            <!-- 右侧内容区 -->
+            <div class="content">
+                <!-- 任务列表视图 -->
+                <div class="task-view" id="taskView">
+                    <div class="tabs">
+                        <div class="tab active">待转换 (2)</div>
+                        <div class="tab">已完成 (1)</div>
+                    </div>
+
+                    <div class="task-list">
+                        <!-- 待转换卡片 1 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="file-info">
+                                    <div class="file-icon">MP4</div>
+                                    <div>
+                                        <div class="file-name">example_video.mp4</div>
+                                        <div class="file-path">D:\Videos\example_video.mp4</div>
+                                    </div>
+                                </div>
+                                <div class="card-actions">
+                                    <span class="status-badge status-running">转换中</span>
+                                    <button class="icon-btn delete">删除</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="format-row">
+                                    <span>源格式: mp4</span>
+                                    <span class="arrow">→</span>
+                                    <span>目标格式:</span>
+                                    <select>
+                                        <option selected>mkv</option>
+                                        <option>avi</option>
+                                        <option>mov</option>
+                                    </select>
+                                </div>
+                                <div class="progress-area">
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill"></div>
+                                    </div>
+                                    <div class="progress-text">
+                                        <span>进度: 65%</span>
+                                        <span>剩余时间: 约 12 秒</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 待转换卡片 2 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="file-info">
+                                    <div class="file-icon" style="background:#fef3c7;color:#d97706">MP3</div>
+                                    <div>
+                                        <div class="file-name">soundtrack.mp3</div>
+                                        <div class="file-path">D:\Music\soundtrack.mp3</div>
+                                    </div>
+                                </div>
+                                <div class="card-actions">
+                                    <span class="status-badge status-waiting">等待中</span>
+                                    <button class="icon-btn start">启动</button>
+                                    <button class="icon-btn delete">删除</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="format-row">
+                                    <span>源格式: mp3</span>
+                                    <span class="arrow">→</span>
+                                    <span>目标格式:</span>
+                                    <select>
+                                        <option>wav</option>
+                                        <option selected>flac</option>
+                                        <option>aac</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设置视图 -->
+                <div class="settings-panel active" id="settingsView">
+                    <div class="settings-title">设置</div>
+
+                    <div class="settings-section">
+                        <h3>常规</h3>
+                        <div class="setting-item">
+                            <div>
+                                <label>默认输出目录</label>
+                                <div class="hint">未设置时输出到源文件同目录</div>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="text" value="D:\Converted" style="min-width:220px">
+                                <button class="btn btn-secondary">浏览</button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div>
+                                <label>启动 GPU 加速</label>
+                                <div class="hint">需要显卡支持（如 NVENC / AMF / QSV）</div>
+                            </div>
+                            <div class="toggle active"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>默认目标格式</h3>
+                        <div class="setting-item">
+                            <label>视频默认格式</label>
+                            <select>
+                                <option>mp4</option>
+                                <option selected>mkv</option>
+                                <option>avi</option>
+                                <option>mov</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>音频默认格式</label>
+                            <select>
+                                <option selected>mp3</option>
+                                <option>wav</option>
+                                <option>flac</option>
+                                <option>aac</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>图片默认格式</label>
+                            <select>
+                                <option>jpg</option>
+                                <option selected>png</option>
+                                <option>gif</option>
+                                <option>webp</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>自定义格式</h3>
+                        <div>
+                            <label style="font-size:12px;color:#666;">视频格式</label>
+                            <div class="format-tag-list">
+                                <span class="format-tag">mp4</span>
+                                <span class="format-tag">mkv</span>
+                                <span class="format-tag">avi</span>
+                                <span class="format-tag">mov</span>
+                                <span class="format-tag add">+ 添加</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;">
+                            <label style="font-size:12px;color:#666;">音频格式</label>
+                            <div class="format-tag-list">
+                                <span class="format-tag">mp3</span>
+                                <span class="format-tag">wav</span>
+                                <span class="format-tag">flac</span>
+                                <span class="format-tag">aac</span>
+                                <span class="format-tag add">+ 添加</span>
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;">
+                            <label style="font-size:12px;color:#666;">图片格式</label>
+                            <div class="format-tag-list">
+                                <span class="format-tag">jpg</span>
+                                <span class="format-tag">png</span>
+                                <span class="format-tag">gif</span>
+                                <span class="format-tag">webp</span>
+                                <span class="format-tag add">+ 添加</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
