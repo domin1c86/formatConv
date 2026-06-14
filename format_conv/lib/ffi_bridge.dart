@@ -24,11 +24,11 @@ class FormatConvBridge {
 
   DynamicLibrary _loadLibrary() {
     if (Platform.isWindows) {
-      return DynamicLibrary.open('format_conv_go.dll');
+      return DynamicLibrary.open('format_conv.dll');
     } else if (Platform.isLinux) {
-      return DynamicLibrary.open('libformat_conv_go.so');
+      return DynamicLibrary.open('libformat_conv.so');
     } else if (Platform.isMacOS) {
-      return DynamicLibrary.open('libformat_conv_go.dylib');
+      return DynamicLibrary.open('libformat_conv.dylib');
     }
     throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
   }
