@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Format Converter
+Comment=Cross-platform format conversion tool
+Exec=format_conv
+Icon=format_conv
+Type=Application
+Categories=Utility;AudioVideo;
+MimeType=video/mp4;video/x-matroska;video/quicktime;video/x-msvideo;video/webm;image/jpeg;image/png;image/webp;image/tiff;audio/mpeg;audio/flac;audio/wav;
+Keywords=convert;format;video;audio;image;

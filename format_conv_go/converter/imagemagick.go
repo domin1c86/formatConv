@@ -45,17 +45,17 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 		byteCallback(0, totalBytes)
 	}
 
-	magickCmd := "magick"
-	if _, err := exec.LookPath("magick"); err != nil {
-		if _, err := exec.LookPath("convert"); err != nil {
+	magickPath, err := ResolveBinary("magick")
+	if err != nil {
+		magickPath, err = ResolveBinary("convert")
+		if err != nil {
 			return fmt.Errorf("neither 'magick' nor 'convert' command found: ImageMagick is not installed")
 		}
-		magickCmd = "convert"
 	}
 
 	args := e.buildArgs(inputPath, outputPath, options)
 
-	cmd := exec.CommandContext(ctx, magickCmd, args...)
+	cmd := exec.CommandContext(ctx, magickPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ImageMagick conversion failed: %s: %w", string(output), err)

@@ -40,9 +40,14 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 		return fmt.Errorf("cannot create output directory: %w", err)
 	}
 
+	ffmpegPath, err := ResolveBinary("ffmpeg")
+	if err != nil {
+		return fmt.Errorf("ffmpeg not found: %w", err)
+	}
+
 	args := e.buildArgs(inputPath, outputPath, options)
 
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -144,7 +149,11 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 }
 
 func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float64 {
-	cmd := exec.CommandContext(ctx, "ffprobe",
+	ffprobePath, err := ResolveBinary("ffprobe")
+	if err != nil {
+		return 0
+	}
+	cmd := exec.CommandContext(ctx, ffprobePath,
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",

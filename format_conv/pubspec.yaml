@@ -19,6 +19,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  msix: ^3.16.0
 
 flutter:
   uses-material-design: true
+
+msix_config:
+  display_name: Format Converter
+  publisher_display_name: FormatConv
+  identity_name: com.formatconv.app
+  msix_version: 1.0.0.0
+  logo_path: windows/runner/resources/app_icon.ico
+  capabilities: internetClient
