@@ -58,12 +58,6 @@ class Win32Window {
   // Stores the child content (Flutter view) that fills the client area.
   HWND child_content_;
 
-  // Called when the DPI changes for the window.
-  void OnDpiScale(UINT dpi);
-
-  // Called when the window is resized.
-  void OnResize(UINT width, UINT height);
-
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT const message,
                                    WPARAM const wparam,
                                    LPARAM const lparam) noexcept;

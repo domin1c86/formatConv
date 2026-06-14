@@ -23,9 +23,6 @@ class FlutterWindow : public Win32Window {
 
  private:
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
-
-  // Runs the event loop for the Flutter engine.
-  void RunEventLoop();
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

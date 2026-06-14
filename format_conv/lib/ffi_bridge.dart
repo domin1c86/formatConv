@@ -35,6 +35,6 @@ class FormatConvBridge {
 
   String getVersion() {
     final ptr = _getVersion();
-    return ptr.toDartString();
+    return ptr.toDartStringAndFree();
   }
 }

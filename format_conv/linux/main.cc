@@ -1,6 +1,3 @@
-#ifndef RUNNER_MAIN_CC_
-#define RUNNER_MAIN_CC_
-
 #include <flutter/flutter_engine.h>
 #include <flutter/flutter_window_controller.h>
 
@@ -38,5 +35,3 @@ int main(int argc, char** argv) {
   window_controller.RunEventLoop();
   return EXIT_SUCCESS;
 }
-
-#endif  // RUNNER_MAIN_CC_
