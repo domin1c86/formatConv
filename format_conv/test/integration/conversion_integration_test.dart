@@ -38,7 +38,8 @@ void main() {
         return;
       }
       final info = await service.detectFormat('video.mp4');
-      expect(info.format, isNotEmpty);
+      expect(info, isNotNull);
+      expect(info?.format, isNotEmpty);
     });
 
     test('detectFormat returns null for unsupported extension', () async {
