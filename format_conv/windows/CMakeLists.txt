@@ -5,15 +5,15 @@ set(BINARY_NAME "format_conv")
 
 add_executable(${BINARY_NAME} WIN32
   "runner/main.cpp"
-  "runner/window_configuration.h"
-  "runner/resource.h"
-  "runner/Runner.rc"
   "runner/flutter_window.cpp"
   "runner/flutter_window.h"
   "runner/win32_window.cpp"
   "runner/win32_window.h"
   "runner/utils.cpp"
   "runner/utils.h"
+  "runner/window_configuration.h"
+  "runner/resource.h"
+  "runner/Runner.rc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -27,4 +27,4 @@ target_include_directories(${BINARY_NAME} PRIVATE
   "${CMAKE_SOURCE_DIR}"
 )
 
-add_dependencies(${BINARY_NAME> flutter_assemble)
+add_dependencies(${BINARY_NAME} flutter_assemble)

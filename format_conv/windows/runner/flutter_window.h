@@ -1,0 +1,31 @@
+#ifndef RUNNER_FLUTTER_WINDOW_H_
+#define RUNNER_FLUTTER_WINDOW_H_
+
+#include <flutter/dart_project.h>
+#include <flutter/flutter_view_controller.h>
+
+#include <memory>
+
+#include "win32_window.h"
+
+class FlutterWindow : public Win32Window {
+ public:
+  explicit FlutterWindow(const flutter::DartProject& project);
+  virtual ~FlutterWindow();
+
+ protected:
+  // Win32Window
+  bool OnCreate() override;
+  void OnDestroy() override;
+  LRESULT MessageHandler(HWND hwnd, UINT const message,
+                         WPARAM const wparam,
+                         LPARAM const lparam) noexcept override;
+
+ private:
+  std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // Runs the event loop for the Flutter engine.
+  void RunEventLoop();
+};
+
+#endif  // RUNNER_FLUTTER_WINDOW_H_

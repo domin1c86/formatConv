@@ -1,27 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'ffi_bridge.dart';
+
+final versionProvider = Provider<String>((ref) {
+  return FormatConvBridge().getVersion();
+});
 
 void main() {
-  runApp(const FormatConvApp());
+  runApp(const ProviderScope(child: FormatConvApp()));
 }
 
-class FormatConvApp extends StatelessWidget {
+class FormatConvApp extends ConsumerWidget {
   const FormatConvApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(versionProvider);
     return MaterialApp(
       title: 'Format Converter',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0066CC)),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: HomePage(version: version),
     );
   }
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final String version;
+  const HomePage({super.key, required this.version});
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +37,8 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Format Converter'),
       ),
-      body: const Center(
-        child: Text('Format Converter - Coming Soon'),
+      body: Center(
+        child: Text('Format Converter v$version - Coming Soon'),
       ),
     );
   }
