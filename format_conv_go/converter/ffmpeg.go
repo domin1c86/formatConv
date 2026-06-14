@@ -53,7 +53,7 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 		return fmt.Errorf("cannot start ffmpeg: %w", err)
 	}
 
-	duration := e.getDuration(inputPath)
+	duration := e.getDuration(ctx, inputPath)
 
 	scanner := bufio.NewScanner(stderr)
 	for scanner.Scan() {
@@ -143,8 +143,8 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 	return args
 }
 
-func (e *FFmpegEngine) getDuration(inputPath string) float64 {
-	cmd := exec.Command("ffprobe",
+func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float64 {
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",

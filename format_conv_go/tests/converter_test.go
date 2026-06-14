@@ -82,7 +82,7 @@ func TestConvertFile_WithProgressCallback(t *testing.T) {
 	}
 
 	var progressCalls atomic.Int64
-	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
+	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status string, errorMsg string) {
 		progressCalls.Add(1)
 	}
 
@@ -112,7 +112,7 @@ func TestConvertFile_ByteProgressCallback(t *testing.T) {
 	}
 
 	var lastTotal atomic.Int64
-	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
+	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status string, errorMsg string) {
 		lastTotal.Store(totalBytes)
 	}
 
@@ -175,7 +175,17 @@ func TestCancelConversion(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	result := conv.CancelConversion(conversionID)
-	_ = result
+	status := waitForCompletion(t, conv, conversionID, 5*time.Second)
+
+	if result {
+		if status.Status != "cancelled" {
+			t.Errorf("Expected final status 'cancelled', got '%s'", status.Status)
+		}
+	} else {
+		if status.Status != "failed" {
+			t.Errorf("Expected status 'failed' if cancel returned false, got '%s'", status.Status)
+		}
+	}
 
 	result = conv.CancelConversion(9999)
 	if result != false {

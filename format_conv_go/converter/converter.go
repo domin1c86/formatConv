@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	StatusPending    = 0
-	StatusProcessing = 0
-	StatusCompleted  = 1
-	StatusFailed     = 2
-	StatusCancelled  = 3
+	StatusPending    = "pending"
+	StatusProcessing = "processing"
+	StatusCompleted  = "completed"
+	StatusFailed     = "failed"
+	StatusCancelled  = "cancelled"
 )
 
 type ConversionEngine interface {
@@ -48,7 +48,7 @@ func NewConverter() *Converter {
 	}
 }
 
-func (c *Converter) ConvertFile(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string)) (uintptr, error) {
+func (c *Converter) ConvertFile(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, string, string)) (uintptr, error) {
 	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
 		return 0, fmt.Errorf("input file does not exist: %s", inputPath)
 	}
@@ -65,7 +65,7 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 
 	status := &models.ConversionStatus{
 		ConversionID: conversionID,
-		Status:       "pending",
+		Status:       StatusPending,
 		OutputPath:   outputPath,
 	}
 	entry := &conversionEntry{status: status}
@@ -79,9 +79,11 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 	return conversionID, nil
 }
 
-func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, inputFormat *models.FormatInfo, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string), entry *conversionEntry) {
+func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, inputFormat *models.FormatInfo, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, string, string), entry *conversionEntry) {
+	ctx, cancel := context.WithCancel(context.Background())
 	entry.mu.Lock()
-	entry.status.Status = "processing"
+	entry.cancel = cancel
+	entry.status.Status = StatusProcessing
 	entry.mu.Unlock()
 
 	var engine ConversionEngine
@@ -92,7 +94,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 		engine = c.imagemagick
 	default:
 		entry.mu.Lock()
-		entry.status.Status = "failed"
+		entry.status.Status = StatusFailed
 		entry.status.Error = "unsupported format type"
 		entry.mu.Unlock()
 		if progressCallback != nil {
@@ -114,20 +116,15 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 		p := entry.status.Progress
 		entry.mu.Unlock()
 		if progressCallback != nil {
-			progressCallback(id, p, processed, total, StatusPending, "")
+			progressCallback(id, p, processed, total, StatusProcessing, "")
 		}
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	entry.mu.Lock()
-	entry.cancel = cancel
-	entry.mu.Unlock()
 
 	err := engine.ConvertWithBytes(ctx, inputPath, outputPath, options, progressFunc, byteFunc)
 
 	if ctx.Err() == context.Canceled {
 		entry.mu.Lock()
-		entry.status.Status = "cancelled"
+		entry.status.Status = StatusCancelled
 		entry.mu.Unlock()
 		if progressCallback != nil {
 			progressCallback(id, 0, 0, 0, StatusCancelled, "")
@@ -137,7 +134,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 
 	if err != nil {
 		entry.mu.Lock()
-		entry.status.Status = "failed"
+		entry.status.Status = StatusFailed
 		entry.status.Error = err.Error()
 		entry.mu.Unlock()
 		if progressCallback != nil {
@@ -147,7 +144,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 	}
 
 	entry.mu.Lock()
-	entry.status.Status = "completed"
+	entry.status.Status = StatusCompleted
 	entry.status.Progress = 1.0
 	pb := entry.status.ProcessedBytes
 	tb := entry.status.TotalBytes
@@ -179,11 +176,9 @@ func (c *Converter) CancelConversion(id uintptr) bool {
 	}
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
-	if entry.status.Status == "processing" {
-		if entry.cancel != nil {
-			entry.cancel()
-		}
-		entry.status.Status = "cancelled"
+	if entry.status.Status == StatusProcessing {
+		entry.cancel()
+		entry.status.Status = StatusCancelled
 		return true
 	}
 	return false
