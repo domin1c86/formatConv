@@ -1,6 +1,12 @@
 package converter
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
 	"format_conv_go/models"
 )
 
@@ -11,12 +17,112 @@ func NewImageMagickEngine() *ImageMagickEngine {
 }
 
 func (e *ImageMagickEngine) Convert(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error {
+	return e.ConvertWithBytes(inputPath, outputPath, options, progressCallback, nil)
+}
+
+func (e *ImageMagickEngine) ConvertWithBytes(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
+	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+		return fmt.Errorf("input file does not exist: %s", inputPath)
+	}
+
+	inputInfo, err := os.Stat(inputPath)
+	if err != nil {
+		return fmt.Errorf("cannot stat input file: %w", err)
+	}
+	totalBytes := inputInfo.Size()
+
+	if !options.Overwrite {
+		if _, err := os.Stat(outputPath); err == nil {
+			return fmt.Errorf("output file already exists: %s", outputPath)
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return fmt.Errorf("cannot create output directory: %w", err)
+	}
+
 	if progressCallback != nil {
 		progressCallback(0.0)
+	}
+	if byteCallback != nil {
+		byteCallback(0, totalBytes)
+	}
+
+	magickCmd := "magick"
+	if _, err := exec.LookPath("magick"); err != nil {
+		if _, err := exec.LookPath("convert"); err != nil {
+			return fmt.Errorf("neither 'magick' nor 'convert' command found: ImageMagick is not installed")
+		}
+		magickCmd = "convert"
+	}
+
+	args := e.buildArgs(magickCmd, inputPath, outputPath, options)
+
+	cmd := exec.Command(magickCmd, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ImageMagick conversion failed: %s: %w", string(output), err)
+	}
+
+	if progressCallback != nil {
 		progressCallback(0.5)
+	}
+	if byteCallback != nil {
+		byteCallback(totalBytes/2, totalBytes)
+	}
+
+	if outInfo, err := os.Stat(outputPath); err == nil {
+		if byteCallback != nil {
+			byteCallback(outInfo.Size(), totalBytes)
+		}
+	}
+
+	if progressCallback != nil {
 		progressCallback(1.0)
 	}
+	if byteCallback != nil {
+		if outInfo, err := os.Stat(outputPath); err == nil {
+			byteCallback(outInfo.Size(), totalBytes)
+		} else {
+			byteCallback(totalBytes, totalBytes)
+		}
+	}
+
 	return nil
+}
+
+func (e *ImageMagickEngine) buildArgs(magickCmd, inputPath, outputPath string, options models.ConversionOptions) []string {
+	args := []string{inputPath}
+
+	if options.Lossless {
+		ext := strings.ToLower(filepath.Ext(outputPath))
+		switch ext {
+		case ".png":
+			args = append(args, "-quality", "0")
+		case ".tiff":
+			args = append(args, "-compress", "LZW")
+		case ".bmp":
+			// BMP is inherently lossless
+		case ".webp":
+			args = append(args, "-quality", "100", "-define", "webp:lossless=true")
+		default:
+			// For JPEG, lossless is not truly possible, but use max quality
+			args = append(args, "-quality", "100")
+		}
+	} else {
+		quality := options.Quality
+		if quality <= 0 {
+			quality = 85
+		}
+		args = append(args, "-quality", fmt.Sprintf("%d", quality))
+	}
+
+	if options.Overwrite {
+		args = append(args, "-overwrite")
+	}
+
+	args = append(args, outputPath)
+	return args
 }
 
 func (e *ImageMagickEngine) SupportedFormats() []string {

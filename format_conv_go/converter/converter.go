@@ -1,11 +1,15 @@
 package converter
 
 import (
+	"fmt"
+	"os"
+
 	"format_conv_go/models"
 )
 
 type ConversionEngine interface {
 	Convert(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error
+	ConvertWithBytes(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error
 	SupportedFormats() []string
 }
 
@@ -28,6 +32,10 @@ func NewConverter() *Converter {
 }
 
 func (c *Converter) ConvertFile(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string)) (uintptr, error) {
+	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+		return 0, fmt.Errorf("input file does not exist: %s", inputPath)
+	}
+
 	inputFormat, err := c.detector.DetectFormat(inputPath)
 	if err != nil {
 		return 0, err
@@ -74,12 +82,17 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 
 	progressFunc := func(progress float64) {
 		status.Progress = progress
+	}
+
+	byteFunc := func(processed, total int64) {
+		status.ProcessedBytes = processed
+		status.TotalBytes = total
 		if progressCallback != nil {
-			progressCallback(id, progress, 0, 0, 0, "")
+			progressCallback(id, status.Progress, processed, total, 0, "")
 		}
 	}
 
-	err := engine.Convert(inputPath, outputPath, options, progressFunc)
+	err := engine.ConvertWithBytes(inputPath, outputPath, options, progressFunc, byteFunc)
 	if err != nil {
 		status.Status = "failed"
 		status.Error = err.Error()
@@ -92,7 +105,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 	status.Status = "completed"
 	status.Progress = 1.0
 	if progressCallback != nil {
-		progressCallback(id, 1.0, 0, 0, 1, "")
+		progressCallback(id, 1.0, status.ProcessedBytes, status.TotalBytes, 1, "")
 	}
 }
 
@@ -108,4 +121,12 @@ func (c *Converter) CancelConversion(id uintptr) bool {
 		}
 	}
 	return false
+}
+
+func (c *Converter) GetSupportedFormats() *models.FormatList {
+	return c.detector.GetSupportedFormats()
+}
+
+func (c *Converter) DetectFormat(filePath string) (*models.FormatInfo, error) {
+	return c.detector.DetectFormat(filePath)
 }
