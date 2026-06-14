@@ -6,7 +6,17 @@ import '../models/format_info.dart';
 import '../models/conversion_status.dart';
 import '../utils/ffi_helper.dart';
 
+typedef _ProgressCallbackNative = Void Function(
+  Int64 id,
+  Double progress,
+  Int64 processed,
+  Int64 total,
+  Int32 status,
+  Pointer<Utf8> error,
+);
+
 class ConversionService {
+  static final Map<int, NativeCallable<_ProgressCallbackNative>> _activeCallbacks = {};
   String getVersion() {
     final ptr = FFIHelper.getVersion();
     final version = ptr.toDartString();
@@ -44,15 +54,36 @@ class ConversionService {
     final inputPtr = inputPath.toNativeUtf8();
     final outputPtr = outputPath.toNativeUtf8();
     final optionsPtr = jsonEncode(options.toJson()).toNativeUtf8();
-    
-    // For now, pass null callback - will be implemented later with NativeCallable
-    final result = FFIHelper.convertFile(inputPtr, outputPtr, optionsPtr, nullptr);
-    
+
+    Pointer<Void> callbackPtr = nullptr;
+    NativeCallable<_ProgressCallbackNative>? nativeCallable;
+
+    if (onProgress != null) {
+      nativeCallable = NativeCallable<_ProgressCallbackNative>.listener(
+        (int id, double progress, int processed, int total, int status, Pointer<Utf8> error) {
+          onProgress(id, progress, processed, total, status, null);
+        },
+      );
+      callbackPtr = nativeCallable.nativeFunction.cast<Void>();
+    }
+
+    final result = FFIHelper.convertFile(inputPtr, outputPtr, optionsPtr, callbackPtr);
+
     calloc.free(inputPtr);
     calloc.free(outputPtr);
     calloc.free(optionsPtr);
-    
+
+    if (nativeCallable != null && result > 0) {
+      _activeCallbacks[result] = nativeCallable;
+    } else {
+      nativeCallable?.close();
+    }
+
     return result;
+  }
+
+  static void disposeProgressCallback(int conversionId) {
+    _activeCallbacks.remove(conversionId)?.close();
   }
   
   Future<ConversionStatus?> getConversionStatus(int conversionId) async {
