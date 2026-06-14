@@ -133,7 +133,7 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 		}
 	} else {
 		if options.Codec != "" {
-			args = append(args, "-c:v", options.Codec)
+			args = append(args, "-c:v", mapCodecName(options.Codec))
 		}
 		if options.Quality > 0 {
 			args = append(args, "-crf", strconv.Itoa(51-options.Quality/2))
@@ -146,6 +146,29 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 
 	args = append(args, outputPath)
 	return args
+}
+
+func mapCodecName(uiName string) string {
+	codecMap := map[string]string{
+		"H.264":      "libx264",
+		"H.265/HEVC": "libx265",
+		"MPEG-4":     "mpeg4",
+		"VP8":        "libvpx",
+		"VP9":        "libvpx-vp9",
+		"AV1":        "libaom-av1",
+		"ProRes":     "prores_ks",
+		"DivX":       "mpeg4",
+		"Xvid":       "mpeg4",
+		"VP6":        "vp6_flv",
+		"WMV3":       "wmv3",
+		"WMV9":       "wmv3",
+		"MPEG-2":     "mpeg2video",
+		"H.263":      "h263",
+	}
+	if mapped, ok := codecMap[uiName]; ok {
+		return mapped
+	}
+	return uiName
 }
 
 func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float64 {

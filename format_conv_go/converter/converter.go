@@ -78,16 +78,12 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 	c.mu.Lock()
 	conversionID := c.nextID
 	c.nextID++
-	c.mu.Unlock()
-
 	status := &models.ConversionStatus{
 		ConversionID: conversionID,
 		Status:       statusToString(StatusPending),
 		OutputPath:   outputPath,
 	}
 	entry := &conversionEntry{status: status}
-
-	c.mu.Lock()
 	c.conversions[conversionID] = entry
 	c.mu.Unlock()
 

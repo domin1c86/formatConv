@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"format_conv_go/models"
 )
@@ -56,23 +57,53 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 	args := e.buildArgs(inputPath, outputPath, options)
 
 	cmd := exec.CommandContext(ctx, magickPath, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("ImageMagick conversion failed: %s: %w", string(output), err)
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("cannot start ImageMagick: %w", err)
 	}
 
-	if progressCallback != nil {
-		progressCallback(1.0)
-	}
-	if byteCallback != nil {
-		if outInfo, err := os.Stat(outputPath); err == nil {
-			byteCallback(outInfo.Size(), totalBytes)
-		} else {
-			byteCallback(totalBytes, totalBytes)
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	progress := 0.0
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-done:
+			if err != nil {
+				return fmt.Errorf("ImageMagick conversion failed: %w", err)
+			}
+			if progressCallback != nil {
+				progressCallback(1.0)
+			}
+			if byteCallback != nil {
+				if outInfo, err := os.Stat(outputPath); err == nil {
+					byteCallback(outInfo.Size(), totalBytes)
+				} else {
+					byteCallback(totalBytes, totalBytes)
+				}
+			}
+			return nil
+		case <-ticker.C:
+			progress += 0.05
+			if progress > 0.9 {
+				progress = 0.9
+			}
+			if progressCallback != nil {
+				progressCallback(progress)
+			}
+			if byteCallback != nil {
+				processed := int64(float64(totalBytes) * progress)
+				byteCallback(processed, totalBytes)
+			}
 		}
 	}
-
-	return nil
 }
 
 func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {

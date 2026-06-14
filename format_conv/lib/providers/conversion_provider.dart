@@ -73,6 +73,41 @@ class ConversionProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> _checkDiskSpace(String outputPath, int inputSizeBytes) async {
+    try {
+      final dir = p.dirname(outputPath);
+      ProcessResult result;
+      if (Platform.isWindows) {
+        final drive = p.rootPrefix(dir);
+        result = await Process.run('wmic', [
+          'logicaldisk',
+          'where',
+          'DeviceID="$drive"',
+          'get',
+          'FreeSpace',
+          '/value',
+        ]);
+        final output = result.stdout.toString();
+        final match = RegExp(r'FreeSpace=(\d+)').firstMatch(output);
+        if (match != null) {
+          final freeSpace = int.parse(match.group(1)!);
+          return freeSpace > inputSizeBytes;
+        }
+      } else {
+        result = await Process.run('df', ['-B1', dir]);
+        final lines = result.stdout.toString().split('\n');
+        if (lines.length >= 2) {
+          final parts = lines[1].split(RegExp(r'\s+'));
+          if (parts.length >= 4) {
+            final freeSpace = int.parse(parts[3]);
+            return freeSpace > inputSizeBytes;
+          }
+        }
+      }
+    } catch (_) {}
+    return true;
+  }
+
   String _friendlyError(String file, String type) {
     switch (type) {
       case 'not_found':
@@ -87,6 +122,10 @@ class ConversionProvider extends ChangeNotifier {
         return 'Cannot write to the output folder.\n'
             'Suggestion: Choose a different output location or '
             'run the application with write permissions.';
+      case 'no_space':
+        return 'Not enough disk space for conversion.\n'
+            'Suggestion: Free up disk space or choose an output '
+            'folder on a drive with more available space.';
       case 'unsupported_format':
         return 'Unsupported output format: $file\n'
             'Suggestion: Choose one of the supported formats '
@@ -143,6 +182,16 @@ class ConversionProvider extends ChangeNotifier {
           continue;
         }
 
+        final inputSize = File(file).lengthSync();
+        if (!await _checkDiskSpace(outputPath, inputSize)) {
+          _results[file] = ConversionResult(
+            outputPath: outputPath,
+            success: false,
+            error: _friendlyError('', 'no_space'),
+          );
+          continue;
+        }
+
         try {
           final conversionId = await _service.convertFile(
             file,
@@ -154,26 +203,30 @@ class ConversionProvider extends ChangeNotifier {
             },
           );
 
-          ConversionStatus? conversionStatus;
-          do {
-            await Future.delayed(const Duration(milliseconds: 100));
-            conversionStatus = await _service.getConversionStatus(conversionId);
-            if (conversionStatus != null) {
-              _currentStatus = conversionStatus;
-              _progress = conversionStatus.progress;
-              notifyListeners();
-            }
-          } while (conversionStatus != null &&
-              conversionStatus.status == 'processing');
+          try {
+            ConversionStatus? conversionStatus;
+            do {
+              await Future.delayed(const Duration(milliseconds: 100));
+              conversionStatus = await _service.getConversionStatus(conversionId);
+              if (conversionStatus != null) {
+                _currentStatus = conversionStatus;
+                _progress = conversionStatus.progress;
+                notifyListeners();
+              }
+            } while (conversionStatus != null &&
+                conversionStatus.status == 'processing');
 
-          final failed = conversionStatus?.status != 'completed';
-          _results[file] = ConversionResult(
-            outputPath: outputPath,
-            success: !failed,
-            error: failed
-                ? _mapBackendError(conversionStatus?.error)
-                : null,
-          );
+            final failed = conversionStatus?.status != 'completed';
+            _results[file] = ConversionResult(
+              outputPath: outputPath,
+              success: !failed,
+              error: failed
+                  ? _mapBackendError(conversionStatus?.error)
+                  : null,
+            );
+          } finally {
+            ConversionService.disposeProgressCallback(conversionId);
+          }
         } catch (e) {
           _results[file] = ConversionResult(
             outputPath: outputPath,

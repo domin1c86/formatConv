@@ -123,6 +123,46 @@ func (d *FormatDetector) initFormats() {
 			"layers":     "yes",
 		},
 	}
+	d.formatMap[".bmp"] = models.FormatInfo{
+		Format: "BMP", Type: "image", Extension: ".bmp", MimeType: "image/bmp",
+		Properties: map[string]string{
+			"color_depth": "1/4/8/24-bit",
+			"transparency": "no",
+			"compression": "none/RLE",
+			"animation":  "no",
+			"max_colors": "16.7M",
+		},
+	}
+	d.formatMap[".gif"] = models.FormatInfo{
+		Format: "GIF", Type: "image", Extension: ".gif", MimeType: "image/gif",
+		Properties: map[string]string{
+			"color_depth": "8-bit",
+			"transparency": "yes",
+			"compression": "LZW",
+			"animation":  "yes",
+			"max_colors": "256",
+		},
+	}
+	d.formatMap[".ico"] = models.FormatInfo{
+		Format: "ICO", Type: "image", Extension: ".ico", MimeType: "image/x-icon",
+		Properties: map[string]string{
+			"color_depth": "1/4/8/24/32-bit",
+			"transparency": "yes",
+			"compression": "none/PNG",
+			"animation":  "no",
+			"max_size":   "256px",
+		},
+	}
+	d.formatMap[".svg"] = models.FormatInfo{
+		Format: "SVG", Type: "image", Extension: ".svg", MimeType: "image/svg+xml",
+		Properties: map[string]string{
+			"color_depth": "N/A",
+			"transparency": "yes",
+			"compression": "text/xml",
+			"animation":  "yes",
+			"scalable":   "yes",
+		},
+	}
 
 	// Audio formats
 	d.formatMap[".mp3"] = models.FormatInfo{
@@ -171,6 +211,36 @@ func (d *FormatDetector) initFormats() {
 			"bitrate":    "32-500 kbps",
 			"channels":   "up to 255",
 			"sample_rate": "8-192 kHz",
+			"compression": "lossy",
+			"tag_support": "Vorbis",
+		},
+	}
+	d.formatMap[".wma"] = models.FormatInfo{
+		Format: "WMA", Type: "audio", Extension: ".wma", MimeType: "audio/x-ms-wma",
+		Properties: map[string]string{
+			"bitrate":    "32-192 kbps",
+			"channels":   "up to 6",
+			"sample_rate": "8-48 kHz",
+			"compression": "lossy/lossless",
+			"tag_support": "WMA",
+		},
+	}
+	d.formatMap[".m4a"] = models.FormatInfo{
+		Format: "M4A", Type: "audio", Extension: ".m4a", MimeType: "audio/mp4",
+		Properties: map[string]string{
+			"bitrate":    "8-529 kbps",
+			"channels":   "up to 48",
+			"sample_rate": "8-96 kHz",
+			"compression": "lossy/lossless",
+			"tag_support": "iTunes",
+		},
+	}
+	d.formatMap[".opus"] = models.FormatInfo{
+		Format: "OPUS", Type: "audio", Extension: ".opus", MimeType: "audio/opus",
+		Properties: map[string]string{
+			"bitrate":    "6-510 kbps",
+			"channels":   "up to 255",
+			"sample_rate": "8-48 kHz",
 			"compression": "lossy",
 			"tag_support": "Vorbis",
 		},

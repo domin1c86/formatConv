@@ -61,7 +61,8 @@ class ConversionService {
     if (onProgress != null) {
       nativeCallable = NativeCallable<_ProgressCallbackNative>.listener(
         (int id, double progress, int processed, int total, int status, Pointer<Utf8> error) {
-          onProgress(id, progress, processed, total, status, null);
+          final errorStr = error == nullptr ? null : error.toDartString();
+          onProgress(id, progress, processed, total, status, errorStr);
         },
       );
       callbackPtr = nativeCallable.nativeFunction.cast<Void>();
