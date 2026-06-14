@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/conversion_options.dart';
 import '../models/conversion_status.dart';
@@ -33,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       for (final file in selectedFiles) {
-        final outputPath = _generateOutputPath(file, format);
+        final outputPath = _generateOutputPath(file, format, options.overwrite);
         try {
           final conversionId = await _conversionService.convertFile(
             file,
@@ -80,10 +83,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _generateOutputPath(String inputPath, String format) {
-    final lastDot = inputPath.lastIndexOf('.');
-    final basePath = lastDot > 0 ? inputPath.substring(0, lastDot) : inputPath;
-    return '$basePath.${format.toLowerCase()}';
+  String _generateOutputPath(String inputPath, String format, bool overwrite) {
+    final dir = p.dirname(inputPath);
+    final baseName = p.basenameWithoutExtension(inputPath);
+    final ext = format.toLowerCase();
+    var outputPath = p.join(dir, '$baseName.$ext');
+
+    if (overwrite) return outputPath;
+
+    int suffix = 1;
+    while (File(outputPath).existsSync()) {
+      outputPath = p.join(dir, '${baseName}_$suffix.$ext');
+      suffix++;
+    }
+    return outputPath;
   }
 
   @override
@@ -98,26 +111,13 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Expanded(
             flex: 1,
-            child: Column(
-              children: [
-                Expanded(
-                  child: FileSelector(
-                    onFilesSelected: (files) {
-                      setState(() {
-                        selectedFiles = files;
-                        results.clear();
-                      });
-                    },
-                  ),
-                ),
-                if (selectedFiles.isNotEmpty || results.isNotEmpty)
-                  Expanded(
-                    child: FilePreviewPanel(
-                      selectedFiles: selectedFiles,
-                      results: results,
-                    ),
-                  ),
-              ],
+            child: FileSelector(
+              onFilesSelected: (files) {
+                setState(() {
+                  selectedFiles = files;
+                  results.clear();
+                });
+              },
             ),
           ),
           Expanded(
@@ -132,6 +132,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+                if (selectedFiles.isNotEmpty || results.isNotEmpty)
+                  FilePreviewPanel(
+                    selectedFiles: selectedFiles,
+                    results: results,
+                  ),
                 if (isConverting)
                   ConversionProgress(
                     progress: progress,

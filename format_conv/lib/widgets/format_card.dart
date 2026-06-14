@@ -28,7 +28,7 @@ class FormatCard extends StatelessWidget {
         : format;
 
     return DragTarget<List<String>>(
-      onWillAcceptWithDetails: (details) => draggedFiles.isNotEmpty,
+      onWillAcceptWithDetails: (details) => details.data.isNotEmpty,
       onAcceptWithDetails: (details) => onTap(),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;

@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-import '../utils/format_descriptions.dart';
+import '../models/format_info.dart';
+import '../services/conversion_service.dart';
 
 class FilePreviewPanel extends StatelessWidget {
   final List<String> selectedFiles;
@@ -68,20 +69,75 @@ class ConversionResult {
   });
 }
 
-class _FileInfoCard extends StatelessWidget {
+class _FileInfoCard extends StatefulWidget {
   final String filePath;
 
   const _FileInfoCard({required this.filePath});
 
   @override
+  State<_FileInfoCard> createState() => _FileInfoCardState();
+}
+
+class _FileInfoCardState extends State<_FileInfoCard> {
+  FormatInfo? _formatInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _detectFormat();
+  }
+
+  Future<void> _detectFormat() async {
+    try {
+      final service = ConversionService();
+      final info = await service.detectFormat(widget.filePath);
+      if (mounted && info != null) {
+        setState(() => _formatInfo = info);
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(filePath);
+    final file = File(widget.filePath);
     final exists = file.existsSync();
     final size = exists ? file.lengthSync() : 0;
     final sizeStr = _formatSize(size);
-    final ext = p.extension(filePath).replaceFirst('.', '').toUpperCase();
-    final name = p.basename(filePath);
+    final ext = p.extension(widget.filePath).replaceFirst('.', '').toUpperCase();
+    final name = p.basename(widget.filePath);
 
+    final width = _formatInfo?.properties['width'];
+    final height = _formatInfo?.properties['height'];
+    final duration = _formatInfo?.properties['duration'];
+    final resolution = (width != null && height != null) ? '${width}x$height' : null;
+    final durationStr = duration != null ? _formatDuration(duration) : null;
+
+    return Draggable<List<String>>(
+      data: [widget.filePath],
+      feedback: Material(
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: Colors.blue[100],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.insert_drive_file, size: 16, color: Colors.blue[700]),
+              const SizedBox(width: 6),
+              Text(name, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.4,
+        child: _buildCard(name, ext, sizeStr, resolution, durationStr),
+      ),
+      child: _buildCard(name, ext, sizeStr, resolution, durationStr),
+    );
+  }
+
+  Widget _buildCard(String name, String ext, String sizeStr, String? resolution, String? durationStr) {
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
       child: Padding(
@@ -104,7 +160,7 @@ class _FileInfoCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '$ext  •  $sizeStr',
+              [ext, sizeStr, if (resolution != null) resolution, if (durationStr != null) durationStr].join('  •  '),
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
@@ -120,6 +176,14 @@ class _FileInfoCard extends StatelessWidget {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  String _formatDuration(String seconds) {
+    final totalSeconds = double.tryParse(seconds);
+    if (totalSeconds == null) return seconds;
+    final mins = totalSeconds ~/ 60;
+    final secs = (totalSeconds % 60).round();
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 }
 
