@@ -22,25 +22,159 @@ func NewFormatDetector() *FormatDetector {
 
 func (d *FormatDetector) initFormats() {
 	// Video formats
-	d.formatMap[".mp4"] = models.FormatInfo{Format: "MP4", Type: "video", Extension: ".mp4", MimeType: "video/mp4"}
-	d.formatMap[".mkv"] = models.FormatInfo{Format: "MKV", Type: "video", Extension: ".mkv", MimeType: "video/x-matroska"}
-	d.formatMap[".mov"] = models.FormatInfo{Format: "MOV", Type: "video", Extension: ".mov", MimeType: "video/quicktime"}
-	d.formatMap[".avi"] = models.FormatInfo{Format: "AVI", Type: "video", Extension: ".avi", MimeType: "video/x-msvideo"}
-	d.formatMap[".webm"] = models.FormatInfo{Format: "WebM", Type: "video", Extension: ".webm", MimeType: "video/webm"}
+	d.formatMap[".mp4"] = models.FormatInfo{
+		Format: "MP4", Type: "video", Extension: ".mp4", MimeType: "video/mp4",
+		Properties: map[string]string{
+			"codec":      "H.264/H.265/AV1",
+			"audio":      "AAC/MP3/AC3",
+			"max_resolution": "8K",
+			"streaming":  "yes",
+			"hardware_acceleration": "yes",
+		},
+	}
+	d.formatMap[".mkv"] = models.FormatInfo{
+		Format: "MKV", Type: "video", Extension: ".mkv", MimeType: "video/x-matroska",
+		Properties: map[string]string{
+			"codec":      "H.264/H.265/VP9/AV1",
+			"audio":      "AAC/FLAC/DTS/AC3",
+			"max_resolution": "8K",
+			"subtitle":   "multi-track",
+			"chapter":    "yes",
+		},
+	}
+	d.formatMap[".mov"] = models.FormatInfo{
+		Format: "MOV", Type: "video", Extension: ".mov", MimeType: "video/quicktime",
+		Properties: map[string]string{
+			"codec":      "H.264/ProRes",
+			"audio":      "AAC/PCM",
+			"max_resolution": "8K",
+			"editing":    "optimized",
+			"metadata":   "rich",
+		},
+	}
+	d.formatMap[".avi"] = models.FormatInfo{
+		Format: "AVI", Type: "video", Extension: ".avi", MimeType: "video/x-msvideo",
+		Properties: map[string]string{
+			"codec":      "DivX/Xvid/H.264",
+			"audio":      "MP3/PCM/AC3",
+			"max_resolution": "4K",
+			"compatibility": "legacy",
+		},
+	}
+	d.formatMap[".webm"] = models.FormatInfo{
+		Format: "WebM", Type: "video", Extension: ".webm", MimeType: "video/webm",
+		Properties: map[string]string{
+			"codec":      "VP8/VP9/AV1",
+			"audio":      "Vorbis/Opus",
+			"max_resolution": "8K",
+			"streaming":  "yes",
+			"web_support": "native",
+		},
+	}
 
 	// Image formats
-	d.formatMap[".jpg"] = models.FormatInfo{Format: "JPEG", Type: "image", Extension: ".jpg", MimeType: "image/jpeg"}
-	d.formatMap[".jpeg"] = models.FormatInfo{Format: "JPEG", Type: "image", Extension: ".jpeg", MimeType: "image/jpeg"}
-	d.formatMap[".png"] = models.FormatInfo{Format: "PNG", Type: "image", Extension: ".png", MimeType: "image/png"}
-	d.formatMap[".webp"] = models.FormatInfo{Format: "WebP", Type: "image", Extension: ".webp", MimeType: "image/webp"}
-	d.formatMap[".tiff"] = models.FormatInfo{Format: "TIFF", Type: "image", Extension: ".tiff", MimeType: "image/tiff"}
+	d.formatMap[".jpg"] = models.FormatInfo{
+		Format: "JPEG", Type: "image", Extension: ".jpg", MimeType: "image/jpeg",
+		Properties: map[string]string{
+			"color_depth": "8-bit",
+			"transparency": "no",
+			"compression": "lossy",
+			"animation":  "no",
+			"max_colors": "16.7M",
+		},
+	}
+	d.formatMap[".jpeg"] = models.FormatInfo{
+		Format: "JPEG", Type: "image", Extension: ".jpeg", MimeType: "image/jpeg",
+		Properties: map[string]string{
+			"color_depth": "8-bit",
+			"transparency": "no",
+			"compression": "lossy",
+			"animation":  "no",
+			"max_colors": "16.7M",
+		},
+	}
+	d.formatMap[".png"] = models.FormatInfo{
+		Format: "PNG", Type: "image", Extension: ".png", MimeType: "image/png",
+		Properties: map[string]string{
+			"color_depth": "8/16-bit",
+			"transparency": "yes",
+			"compression": "lossless",
+			"animation":  "no",
+			"max_colors": "16.7M+",
+		},
+	}
+	d.formatMap[".webp"] = models.FormatInfo{
+		Format: "WebP", Type: "image", Extension: ".webp", MimeType: "image/webp",
+		Properties: map[string]string{
+			"color_depth": "8-bit",
+			"transparency": "yes",
+			"compression": "lossy/lossless",
+			"animation":  "yes",
+			"max_colors": "16.7M",
+		},
+	}
+	d.formatMap[".tiff"] = models.FormatInfo{
+		Format: "TIFF", Type: "image", Extension: ".tiff", MimeType: "image/tiff",
+		Properties: map[string]string{
+			"color_depth": "8/16/32-bit",
+			"transparency": "yes",
+			"compression": "none/LZW/ZIP",
+			"animation":  "no",
+			"layers":     "yes",
+		},
+	}
 
 	// Audio formats
-	d.formatMap[".mp3"] = models.FormatInfo{Format: "MP3", Type: "audio", Extension: ".mp3", MimeType: "audio/mpeg"}
-	d.formatMap[".flac"] = models.FormatInfo{Format: "FLAC", Type: "audio", Extension: ".flac", MimeType: "audio/flac"}
-	d.formatMap[".wav"] = models.FormatInfo{Format: "WAV", Type: "audio", Extension: ".wav", MimeType: "audio/wav"}
-	d.formatMap[".aac"] = models.FormatInfo{Format: "AAC", Type: "audio", Extension: ".aac", MimeType: "audio/aac"}
-	d.formatMap[".ogg"] = models.FormatInfo{Format: "OGG", Type: "audio", Extension: ".ogg", MimeType: "audio/ogg"}
+	d.formatMap[".mp3"] = models.FormatInfo{
+		Format: "MP3", Type: "audio", Extension: ".mp3", MimeType: "audio/mpeg",
+		Properties: map[string]string{
+			"bitrate":    "8-320 kbps",
+			"channels":   "mono/stereo",
+			"sample_rate": "8-48 kHz",
+			"compression": "lossy",
+			"tag_support": "ID3",
+		},
+	}
+	d.formatMap[".flac"] = models.FormatInfo{
+		Format: "FLAC", Type: "audio", Extension: ".flac", MimeType: "audio/flac",
+		Properties: map[string]string{
+			"bitrate":    "variable",
+			"channels":   "up to 8",
+			"sample_rate": "up to 655.35 kHz",
+			"compression": "lossless",
+			"tag_support": "Vorbis",
+		},
+	}
+	d.formatMap[".wav"] = models.FormatInfo{
+		Format: "WAV", Type: "audio", Extension: ".wav", MimeType: "audio/wav",
+		Properties: map[string]string{
+			"bitrate":    "uncompressed",
+			"channels":   "up to 65535",
+			"sample_rate": "up to 4 GHz",
+			"compression": "none/PCM",
+			"tag_support": "RIFF INFO",
+		},
+	}
+	d.formatMap[".aac"] = models.FormatInfo{
+		Format: "AAC", Type: "audio", Extension: ".aac", MimeType: "audio/aac",
+		Properties: map[string]string{
+			"bitrate":    "8-529 kbps",
+			"channels":   "up to 48",
+			"sample_rate": "8-96 kHz",
+			"compression": "lossy",
+			"tag_support": "ID3/MP4",
+		},
+	}
+	d.formatMap[".ogg"] = models.FormatInfo{
+		Format: "OGG", Type: "audio", Extension: ".ogg", MimeType: "audio/ogg",
+		Properties: map[string]string{
+			"bitrate":    "32-500 kbps",
+			"channels":   "up to 255",
+			"sample_rate": "8-192 kHz",
+			"compression": "lossy",
+			"tag_support": "Vorbis",
+		},
+	}
 }
 
 func (d *FormatDetector) DetectFormat(filePath string) (*models.FormatInfo, error) {
