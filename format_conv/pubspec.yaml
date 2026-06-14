@@ -12,8 +12,8 @@ dependencies:
   ffi: ^2.0.2
   path_provider: ^2.1.1
   file_picker: ^6.1.1
-  flutter_riverpod: ^2.4.9  # Chosen over provider for compile-safe state, auto-dispose, and better testability
-  provider: ^6.0.0
+  flutter_riverpod: ^2.4.9
+  path: ^1.8.0
 
 dev_dependencies:
   flutter_test:

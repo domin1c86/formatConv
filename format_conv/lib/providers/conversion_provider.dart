@@ -2,11 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/conversion_options.dart';
 import '../models/conversion_status.dart';
 import '../services/conversion_service.dart';
+import '../utils/format_descriptions.dart';
 import '../widgets/preview_panel.dart';
+
+final conversionProvider = ChangeNotifierProvider<ConversionProvider>((ref) {
+  return ConversionProvider();
+});
 
 class ConversionProvider extends ChangeNotifier {
   final ConversionService _service = ConversionService();
@@ -27,6 +33,9 @@ class ConversionProvider extends ChangeNotifier {
   String? get error => _error;
   Map<String, ConversionResult> get results => _results;
 
+  static final Set<String> supportedFormats =
+      formatDescriptions.keys.map((k) => k.toUpperCase()).toSet();
+
   void selectFiles(List<String> files) {
     _selectedFiles = files;
     _results.clear();
@@ -38,10 +47,66 @@ class ConversionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _validateFile(String file) {
+    final f = File(file);
+    if (!f.existsSync()) {
+      return false;
+    }
+    try {
+      f.statSync();
+      f.openSync(mode: FileMode.read).closeSync();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _checkOutputWritable(String outputPath) {
+    final dir = p.dirname(outputPath);
+    final testFile = File(p.join(dir, '.formatconv_write_test'));
+    try {
+      testFile.writeAsStringSync('');
+      testFile.deleteSync();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _friendlyError(String file, String type) {
+    switch (type) {
+      case 'not_found':
+        return 'File not found: ${p.basename(file)}\n'
+            'Suggestion: The file may have been moved or deleted. '
+            'Re-select the file and try again.';
+      case 'permission_read':
+        return 'Cannot read file: ${p.basename(file)}\n'
+            'Suggestion: Close any applications using this file, '
+            'then check that you have read permission.';
+      case 'permission_write':
+        return 'Cannot write to the output folder.\n'
+            'Suggestion: Choose a different output location or '
+            'run the application with write permissions.';
+      case 'unsupported_format':
+        return 'Unsupported output format: $file\n'
+            'Suggestion: Choose one of the supported formats '
+            '(${supportedFormats.take(5).join(", ")}, ...).';
+      default:
+        return file;
+    }
+  }
+
   Future<void> startConversion(String format, ConversionOptions options) async {
     if (_selectedFiles.isEmpty) return;
 
-    _selectedFormat = format;
+    final normalizedFormat = format.toUpperCase();
+    if (!supportedFormats.contains(normalizedFormat)) {
+      _error = _friendlyError(format, 'unsupported_format');
+      notifyListeners();
+      return;
+    }
+
+    _selectedFormat = normalizedFormat;
     _isConverting = true;
     _error = null;
     _results.clear();
@@ -49,7 +114,35 @@ class ConversionProvider extends ChangeNotifier {
 
     try {
       for (final file in _selectedFiles) {
-        final outputPath = _generateOutputPath(file, format, options.overwrite);
+        if (!File(file).existsSync()) {
+          _results[file] = ConversionResult(
+            outputPath: '',
+            success: false,
+            error: _friendlyError(file, 'not_found'),
+          );
+          continue;
+        }
+
+        if (!_validateFile(file)) {
+          _results[file] = ConversionResult(
+            outputPath: '',
+            success: false,
+            error: _friendlyError(file, 'permission_read'),
+          );
+          continue;
+        }
+
+        final outputPath = _generateOutputPath(file, normalizedFormat, options.overwrite);
+
+        if (!_checkOutputWritable(outputPath)) {
+          _results[file] = ConversionResult(
+            outputPath: outputPath,
+            success: false,
+            error: _friendlyError('', 'permission_write'),
+          );
+          continue;
+        }
+
         try {
           final conversionId = await _service.convertFile(
             file,
@@ -73,25 +166,53 @@ class ConversionProvider extends ChangeNotifier {
           } while (conversionStatus != null &&
               conversionStatus.status == 'processing');
 
+          final failed = conversionStatus?.status != 'completed';
           _results[file] = ConversionResult(
             outputPath: outputPath,
-            success: conversionStatus?.status == 'completed',
-            error: conversionStatus?.error,
+            success: !failed,
+            error: failed
+                ? _mapBackendError(conversionStatus?.error)
+                : null,
           );
         } catch (e) {
           _results[file] = ConversionResult(
             outputPath: outputPath,
             success: false,
-            error: e.toString(),
+            error: _mapBackendError(e.toString()),
           );
         }
       }
     } catch (e) {
-      _error = e.toString();
+      _error = _mapBackendError(e.toString());
     } finally {
       _isConverting = false;
       notifyListeners();
     }
+  }
+
+  String _mapBackendError(String? raw) {
+    if (raw == null) return 'Unknown error occurred.';
+    if (raw.contains('permission') || raw.contains('Permission')) {
+      return 'Permission denied.\n'
+          'Suggestion: Ensure you have read/write access to both '
+          'the input file and output folder.';
+    }
+    if (raw.contains('No space') || raw.contains('disk full')) {
+      return 'Not enough disk space.\n'
+          'Suggestion: Free up disk space or choose an output '
+          'folder on a drive with more available space.';
+    }
+    if (raw.contains('codec') || raw.contains('not supported')) {
+      return 'The selected codec is not available for this format.\n'
+          'Suggestion: Try a different codec or use the default codec.';
+    }
+    if (raw.contains('corrupt') || raw.contains('invalid')) {
+      return 'The input file appears to be corrupt or invalid.\n'
+          'Suggestion: Try opening the file in another application to verify it works.';
+    }
+    return 'Conversion failed: $raw\n'
+        'Suggestion: Try again with different settings, or '
+        'check that the input file is valid.';
   }
 
   Future<void> cancelConversion() async {
