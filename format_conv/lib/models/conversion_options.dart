@@ -11,6 +11,20 @@ class ConversionOptions {
     this.overwrite = false,
   });
 
+  ConversionOptions copyWith({
+    bool? lossless,
+    int? quality,
+    String? codec,
+    bool? overwrite,
+  }) {
+    return ConversionOptions(
+      lossless: lossless ?? this.lossless,
+      quality: quality ?? this.quality,
+      codec: codec ?? this.codec,
+      overwrite: overwrite ?? this.overwrite,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'lossless': lossless,
     'quality': quality,

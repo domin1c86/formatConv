@@ -8,5 +8,17 @@ void main() {
       const MaterialApp(home: HomeScreen()),
     );
     expect(find.text('Format Converter'), findsOneWidget);
+    expect(find.text('Select Files'), findsOneWidget);
+    expect(find.text('Select Output Format'), findsOneWidget);
+  });
+
+  testWidgets('Home screen shows empty state message', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeScreen()),
+    );
+    expect(
+      find.text('Select files first, then click a format to convert'),
+      findsOneWidget,
+    );
   });
 }
