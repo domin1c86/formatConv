@@ -51,11 +51,6 @@ FormatConv is a cross-platform format conversion tool that allows you to convert
 - "Conversion failed": Error during conversion process
 - "Disk space insufficient": Not enough space for output file
 
-## Keyboard Shortcuts
-- `Ctrl+O` (Windows/Linux) / `Cmd+O` (macOS): Open file dialog
-- `Ctrl+Enter` (Windows/Linux) / `Cmd+Enter` (macOS): Start conversion
-- `Escape`: Cancel current operation
-
 ## System Requirements
 - Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+)
 - 4GB RAM minimum
