@@ -82,7 +82,7 @@ func TestConvertFile_WithProgressCallback(t *testing.T) {
 	}
 
 	var progressCalls atomic.Int64
-	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status string, errorMsg string) {
+	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
 		progressCalls.Add(1)
 	}
 
@@ -112,7 +112,7 @@ func TestConvertFile_ByteProgressCallback(t *testing.T) {
 	}
 
 	var lastTotal atomic.Int64
-	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status string, errorMsg string) {
+	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
 		lastTotal.Store(totalBytes)
 	}
 

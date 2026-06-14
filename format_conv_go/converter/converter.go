@@ -10,12 +10,29 @@ import (
 )
 
 const (
-	StatusPending    = "pending"
-	StatusProcessing = "processing"
-	StatusCompleted  = "completed"
-	StatusFailed     = "failed"
-	StatusCancelled  = "cancelled"
+	StatusPending    = 0
+	StatusProcessing = 1
+	StatusCompleted  = 2
+	StatusFailed     = 3
+	StatusCancelled  = 4
 )
+
+func statusToString(s int) string {
+	switch s {
+	case StatusPending:
+		return "pending"
+	case StatusProcessing:
+		return "processing"
+	case StatusCompleted:
+		return "completed"
+	case StatusFailed:
+		return "failed"
+	case StatusCancelled:
+		return "cancelled"
+	default:
+		return "unknown"
+	}
+}
 
 type ConversionEngine interface {
 	Convert(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error
@@ -48,7 +65,7 @@ func NewConverter() *Converter {
 	}
 }
 
-func (c *Converter) ConvertFile(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, string, string)) (uintptr, error) {
+func (c *Converter) ConvertFile(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string)) (uintptr, error) {
 	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
 		return 0, fmt.Errorf("input file does not exist: %s", inputPath)
 	}
@@ -65,7 +82,7 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 
 	status := &models.ConversionStatus{
 		ConversionID: conversionID,
-		Status:       StatusPending,
+		Status:       statusToString(StatusPending),
 		OutputPath:   outputPath,
 	}
 	entry := &conversionEntry{status: status}
@@ -79,11 +96,11 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 	return conversionID, nil
 }
 
-func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, inputFormat *models.FormatInfo, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, string, string), entry *conversionEntry) {
+func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, inputFormat *models.FormatInfo, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string), entry *conversionEntry) {
 	ctx, cancel := context.WithCancel(context.Background())
 	entry.mu.Lock()
 	entry.cancel = cancel
-	entry.status.Status = StatusProcessing
+	entry.status.Status = statusToString(StatusProcessing)
 	entry.mu.Unlock()
 
 	var engine ConversionEngine
@@ -94,7 +111,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 		engine = c.imagemagick
 	default:
 		entry.mu.Lock()
-		entry.status.Status = StatusFailed
+		entry.status.Status = statusToString(StatusFailed)
 		entry.status.Error = "unsupported format type"
 		entry.mu.Unlock()
 		if progressCallback != nil {
@@ -124,7 +141,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 
 	if ctx.Err() == context.Canceled {
 		entry.mu.Lock()
-		entry.status.Status = StatusCancelled
+		entry.status.Status = statusToString(StatusCancelled)
 		entry.mu.Unlock()
 		if progressCallback != nil {
 			progressCallback(id, 0, 0, 0, StatusCancelled, "")
@@ -134,7 +151,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 
 	if err != nil {
 		entry.mu.Lock()
-		entry.status.Status = StatusFailed
+		entry.status.Status = statusToString(StatusFailed)
 		entry.status.Error = err.Error()
 		entry.mu.Unlock()
 		if progressCallback != nil {
@@ -144,7 +161,7 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 	}
 
 	entry.mu.Lock()
-	entry.status.Status = StatusCompleted
+	entry.status.Status = statusToString(StatusCompleted)
 	entry.status.Progress = 1.0
 	pb := entry.status.ProcessedBytes
 	tb := entry.status.TotalBytes
@@ -176,9 +193,9 @@ func (c *Converter) CancelConversion(id uintptr) bool {
 	}
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
-	if entry.status.Status == StatusProcessing {
+	if entry.status.Status == statusToString(StatusProcessing) {
 		entry.cancel()
-		entry.status.Status = StatusCancelled
+		entry.status.Status = statusToString(StatusCancelled)
 		return true
 	}
 	return false
