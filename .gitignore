@@ -1,0 +1,36 @@
+.venv/
+docs/
+mockup.html
+CLAUDE.md
+AGENT.md
+
+# Flutter
+format_conv/.dart_tool/
+format_conv/.packages
+format_conv/build/
+format_conv/.flutter-plugins
+format_conv/.flutter-plugins-dependencies
+format_conv/pubspec.lock
+format_conv/.metadata
+format_conv/android/
+format_conv/ios/
+format_conv/linux/flutter/
+format_conv/macos/Flutter/
+format_conv/windows/flutter/
+format_conv/web/
+*.iml
+.idea/
+.vscode/
+
+# Go
+format_conv_go/*.dll
+format_conv_go/*.dylib
+format_conv_go/*.so
+format_conv_go/*.h
+format_conv_go/vendor/
+
+# General
+*.exe
+*.log
+.DS_Store
+Thumbs.db
