@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +19,20 @@ func setupTestFile(t *testing.T, name string) string {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 	return path
+}
+
+func waitForCompletion(t *testing.T, conv *converter.Converter, id uintptr, timeout time.Duration) *models.ConversionStatus {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		status := conv.GetConversionStatus(id)
+		if status != nil && (status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled") {
+			return status
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("Timed out waiting for conversion to complete")
+	return nil
 }
 
 func TestConvertFile_VideoToVideo(t *testing.T) {
@@ -38,9 +53,7 @@ func TestConvertFile_VideoToVideo(t *testing.T) {
 		t.Fatal("Expected conversion ID > 0, got 0")
 	}
 
-	time.Sleep(500 * time.Millisecond)
-
-	status := conv.GetConversionStatus(conversionID)
+	status := waitForCompletion(t, conv, conversionID, 5*time.Second)
 	if status == nil {
 		t.Fatal("Expected non-nil status")
 	}
@@ -68,9 +81,9 @@ func TestConvertFile_WithProgressCallback(t *testing.T) {
 		Overwrite: true,
 	}
 
-	progressCalls := 0
+	var progressCalls atomic.Int64
 	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
-		progressCalls++
+		progressCalls.Add(1)
 	}
 
 	conversionID, err := conv.ConvertFile(inputPath, outputPath, options, callback)
@@ -81,9 +94,9 @@ func TestConvertFile_WithProgressCallback(t *testing.T) {
 		t.Fatal("Expected conversion ID > 0, got 0")
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	waitForCompletion(t, conv, conversionID, 5*time.Second)
 
-	if progressCalls == 0 {
+	if progressCalls.Load() == 0 {
 		t.Error("Expected progress callback to be called at least once")
 	}
 }
@@ -98,9 +111,9 @@ func TestConvertFile_ByteProgressCallback(t *testing.T) {
 		Overwrite: true,
 	}
 
-	var lastTotal int64
+	var lastTotal atomic.Int64
 	callback := func(id uintptr, progress float64, processedBytes int64, totalBytes int64, status int, errorMsg string) {
-		lastTotal = totalBytes
+		lastTotal.Store(totalBytes)
 	}
 
 	conversionID, err := conv.ConvertFile(inputPath, outputPath, options, callback)
@@ -108,7 +121,7 @@ func TestConvertFile_ByteProgressCallback(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	waitForCompletion(t, conv, conversionID, 5*time.Second)
 
 	status := conv.GetConversionStatus(conversionID)
 	if status == nil {
@@ -118,7 +131,7 @@ func TestConvertFile_ByteProgressCallback(t *testing.T) {
 	if status.TotalBytes == 0 && status.Status != "failed" {
 		t.Error("Expected total bytes to be non-zero when conversion didn't fail due to missing tools")
 	}
-	_ = lastTotal
+	_ = lastTotal.Load()
 }
 
 func TestConvertFile_UnsupportedFormat(t *testing.T) {

@@ -1,6 +1,7 @@
 package converter
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,15 +17,11 @@ func NewImageMagickEngine() *ImageMagickEngine {
 	return &ImageMagickEngine{}
 }
 
-func (e *ImageMagickEngine) Convert(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error {
-	return e.ConvertWithBytes(inputPath, outputPath, options, progressCallback, nil)
+func (e *ImageMagickEngine) Convert(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error {
+	return e.ConvertWithBytes(ctx, inputPath, outputPath, options, progressCallback, nil)
 }
 
-func (e *ImageMagickEngine) ConvertWithBytes(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
-	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-		return fmt.Errorf("input file does not exist: %s", inputPath)
-	}
-
+func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
 	inputInfo, err := os.Stat(inputPath)
 	if err != nil {
 		return fmt.Errorf("cannot stat input file: %w", err)
@@ -56,25 +53,12 @@ func (e *ImageMagickEngine) ConvertWithBytes(inputPath, outputPath string, optio
 		magickCmd = "convert"
 	}
 
-	args := e.buildArgs(magickCmd, inputPath, outputPath, options)
+	args := e.buildArgs(inputPath, outputPath, options)
 
-	cmd := exec.Command(magickCmd, args...)
+	cmd := exec.CommandContext(ctx, magickCmd, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ImageMagick conversion failed: %s: %w", string(output), err)
-	}
-
-	if progressCallback != nil {
-		progressCallback(0.5)
-	}
-	if byteCallback != nil {
-		byteCallback(totalBytes/2, totalBytes)
-	}
-
-	if outInfo, err := os.Stat(outputPath); err == nil {
-		if byteCallback != nil {
-			byteCallback(outInfo.Size(), totalBytes)
-		}
 	}
 
 	if progressCallback != nil {
@@ -91,7 +75,7 @@ func (e *ImageMagickEngine) ConvertWithBytes(inputPath, outputPath string, optio
 	return nil
 }
 
-func (e *ImageMagickEngine) buildArgs(magickCmd, inputPath, outputPath string, options models.ConversionOptions) []string {
+func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {
 	args := []string{inputPath}
 
 	if options.Lossless {
@@ -115,10 +99,6 @@ func (e *ImageMagickEngine) buildArgs(magickCmd, inputPath, outputPath string, o
 			quality = 85
 		}
 		args = append(args, "-quality", fmt.Sprintf("%d", quality))
-	}
-
-	if options.Overwrite {
-		args = append(args, "-overwrite")
 	}
 
 	args = append(args, outputPath)

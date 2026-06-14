@@ -19,15 +19,11 @@ func NewFFmpegEngine() *FFmpegEngine {
 	return &FFmpegEngine{}
 }
 
-func (e *FFmpegEngine) Convert(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error {
-	return e.ConvertWithBytes(inputPath, outputPath, options, progressCallback, nil)
+func (e *FFmpegEngine) Convert(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64)) error {
+	return e.ConvertWithBytes(ctx, inputPath, outputPath, options, progressCallback, nil)
 }
 
-func (e *FFmpegEngine) ConvertWithBytes(inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
-	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-		return fmt.Errorf("input file does not exist: %s", inputPath)
-	}
-
+func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
 	inputInfo, err := os.Stat(inputPath)
 	if err != nil {
 		return fmt.Errorf("cannot stat input file: %w", err)
@@ -45,9 +41,6 @@ func (e *FFmpegEngine) ConvertWithBytes(inputPath, outputPath string, options mo
 	}
 
 	args := e.buildArgs(inputPath, outputPath, options)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 
@@ -94,6 +87,9 @@ func (e *FFmpegEngine) ConvertWithBytes(inputPath, outputPath string, options mo
 				}
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading ffmpeg output: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
@@ -166,9 +162,6 @@ func (e *FFmpegEngine) getDuration(inputPath string) float64 {
 }
 
 func (e *FFmpegEngine) parseTime(line string) float64 {
-	if !strings.Contains(line, "time=") {
-		return 0
-	}
 	idx := strings.Index(line, "time=")
 	if idx < 0 {
 		return 0
@@ -190,9 +183,6 @@ func (e *FFmpegEngine) parseTime(line string) float64 {
 }
 
 func (e *FFmpegEngine) parseOutputSize(line string) int64 {
-	if !strings.Contains(line, "size=") {
-		return 0
-	}
 	idx := strings.Index(line, "size=")
 	if idx < 0 {
 		return 0
