@@ -67,10 +67,10 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 		done <- cmd.Wait()
 	}()
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	// Periodically check output file size for real progress
+	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
-	progress := 0.0
 	for {
 		select {
 		case <-ctx.Done():
@@ -83,23 +83,25 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 				progressCallback(1.0)
 			}
 			if byteCallback != nil {
-				if outInfo, err := os.Stat(outputPath); err == nil {
-					byteCallback(outInfo.Size(), totalBytes)
-				} else {
-					byteCallback(totalBytes, totalBytes)
-				}
+				byteCallback(totalBytes, totalBytes)
 			}
 			return nil
 		case <-ticker.C:
-			progress += 0.05
-			if progress > 0.9 {
-				progress = 0.9
+			var progress float64
+			var processed int64
+			if outInfo, err := os.Stat(outputPath); err == nil {
+				processed = outInfo.Size()
+				if totalBytes > 0 {
+					progress = float64(processed) / float64(totalBytes)
+					if progress > 0.95 {
+						progress = 0.95 // Cap at 95% until process completes
+					}
+				}
 			}
 			if progressCallback != nil {
 				progressCallback(progress)
 			}
 			if byteCallback != nil {
-				processed := int64(float64(totalBytes) * progress)
 				byteCallback(processed, totalBytes)
 			}
 		}
