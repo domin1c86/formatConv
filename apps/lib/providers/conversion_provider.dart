@@ -260,7 +260,8 @@ class ConversionProvider extends ChangeNotifier {
             ConversionStatus? conversionStatus;
             do {
               await Future.delayed(const Duration(milliseconds: 100));
-              conversionStatus = await _service.getConversionStatus(conversionId);
+              conversionStatus =
+                  await _service.getConversionStatus(conversionId);
               if (conversionStatus != null) {
                 _currentStatus = conversionStatus;
                 _progress = conversionStatus.progress;
@@ -276,9 +277,7 @@ class ConversionProvider extends ChangeNotifier {
               success: !failed,
               startedAt: startedAt,
               finishedAt: DateTime.now(),
-              error: failed
-                  ? _mapBackendError(conversionStatus?.error)
-                  : null,
+              error: failed ? _mapBackendError(conversionStatus?.error) : null,
             );
             _results[file] = result;
             onResult?.call(result);
@@ -360,7 +359,9 @@ class ConversionProvider extends ChangeNotifier {
     int suffix = 1;
     while (File(outputPath).existsSync()) {
       final generatedName = template.contains(r'$name$')
-          ? template.replaceAll(r'$name$', baseName).replaceAll(r'$num$', '$suffix')
+          ? template
+              .replaceAll(r'$name$', baseName)
+              .replaceAll(r'$num$', '$suffix')
           : '${baseName}_$suffix';
       outputPath = p.join(dir, '$generatedName.$ext');
       suffix++;

@@ -49,13 +49,18 @@ class FormatConvApp extends ConsumerWidget {
         : _readColor(tokens, 'surface', Colors.white);
     final border = _readColor(tokens, 'border', const Color(0xFFE0E0E0));
     final radius = (tokens['cardRadius'] as num?)?.toDouble() ?? 14;
+    final hoverBlue = actionBlue.withValues(alpha: 0.08);
+    final pressedBlue = actionBlue.withValues(alpha: 0.14);
+    final clickCursor = WidgetStateProperty.all(SystemMouseCursors.click);
 
     final base = ThemeData(
       colorScheme: ColorScheme.fromSeed(
         seedColor: actionBlue,
         primary: actionBlue,
         surface: surface,
-        brightness: settings.theme == AppThemeChoice.dark ? Brightness.dark : Brightness.light,
+        brightness: settings.theme == AppThemeChoice.dark
+            ? Brightness.dark
+            : Brightness.light,
       ),
       scaffoldBackgroundColor: background,
       fontFamily: settings.fontFamily.isEmpty ? 'MiSans' : settings.fontFamily,
@@ -66,7 +71,8 @@ class FormatConvApp extends ConsumerWidget {
       textTheme: base.textTheme.apply(
         bodyColor: ink,
         displayColor: ink,
-        fontFamily: settings.fontFamily.isEmpty ? 'MiSans' : settings.fontFamily,
+        fontFamily:
+            settings.fontFamily.isEmpty ? 'MiSans' : settings.fontFamily,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.black,
@@ -82,6 +88,29 @@ class FormatConvApp extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
           shape: const StadiumBorder(),
           elevation: 0,
+        ).copyWith(
+          mouseCursor: clickCursor,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return Colors.white24;
+            if (states.contains(WidgetState.hovered)) return Colors.white12;
+            return null;
+          }),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: actionBlue,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(44, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+          shape: const StadiumBorder(),
+        ).copyWith(
+          mouseCursor: clickCursor,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return Colors.white24;
+            if (states.contains(WidgetState.hovered)) return Colors.white12;
+            return null;
+          }),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -89,8 +118,37 @@ class FormatConvApp extends ConsumerWidget {
           foregroundColor: actionBlue,
           minimumSize: const Size(44, 44),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-          side: const BorderSide(color: actionBlue),
+          side: BorderSide(color: actionBlue),
           shape: const StadiumBorder(),
+        ).copyWith(
+          mouseCursor: clickCursor,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return pressedBlue;
+            if (states.contains(WidgetState.hovered)) return hoverBlue;
+            return null;
+          }),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: actionBlue,
+          shape: const StadiumBorder(),
+        ).copyWith(
+          mouseCursor: clickCursor,
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return pressedBlue;
+            if (states.contains(WidgetState.hovered)) return hoverBlue;
+            return null;
+          }),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: ink,
+          hoverColor: hoverBlue,
+          highlightColor: pressedBlue,
+        ).copyWith(
+          mouseCursor: clickCursor,
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -98,12 +156,12 @@ class FormatConvApp extends ConsumerWidget {
           if (states.contains(WidgetState.selected)) return actionBlue;
           return Colors.white;
         }),
-          side: BorderSide(color: border),
+        side: BorderSide(color: border),
       ),
-      sliderTheme: const SliderThemeData(
+      sliderTheme: SliderThemeData(
         activeTrackColor: actionBlue,
         thumbColor: actionBlue,
-        overlayColor: Color(0x220066CC),
+        overlayColor: const Color(0x220066CC),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,

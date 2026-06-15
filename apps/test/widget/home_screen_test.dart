@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:format_conv/screens/home_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   Future<void> pumpHomeScreen(WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -20,7 +18,8 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('Home screen renders workbench sections', (WidgetTester tester) async {
+  testWidgets('Home screen renders workbench sections',
+      (WidgetTester tester) async {
     await pumpHomeScreen(tester);
 
     expect(find.text('Add Files', skipOffstage: false), findsOneWidget);
@@ -30,7 +29,8 @@ void main() {
     expect(find.text('Settings', skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('Home screen shows empty format guidance', (WidgetTester tester) async {
+  testWidgets('Home screen shows empty format guidance',
+      (WidgetTester tester) async {
     await pumpHomeScreen(tester);
 
     expect(

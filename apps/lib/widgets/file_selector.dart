@@ -63,7 +63,9 @@ class FileSelector extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: active ? const Color(0xFF2A2A2C) : const Color(0xFF252527),
+                    color: active
+                        ? const Color(0xFF2A2A2C)
+                        : const Color(0xFF252527),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: active
@@ -105,7 +107,8 @@ class FileSelector extends StatelessWidget {
                             allowMultiple: true,
                           );
                           if (result != null) {
-                            onFilesSelected(result.paths.whereType<String>().toList());
+                            onFilesSelected(
+                                result.paths.whereType<String>().toList());
                           }
                         },
                         icon: const Icon(Icons.folder_open_outlined, size: 18),

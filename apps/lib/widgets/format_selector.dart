@@ -6,13 +6,71 @@ import '../l10n/app_strings.dart';
 import '../models/conversion_options.dart';
 import 'format_card.dart';
 
-const _videoExtensions = {'.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.wmv', '.mpeg', '.3gp'};
-const _imageExtensions = {'.jpeg', '.jpg', '.png', '.webp', '.tiff', '.tif', '.bmp', '.gif', '.ico', '.svg'};
-const _audioExtensions = {'.mp3', '.flac', '.wav', '.aac', '.ogg', '.wma', '.m4a', '.opus'};
+const _videoExtensions = {
+  '.mp4',
+  '.mkv',
+  '.mov',
+  '.avi',
+  '.webm',
+  '.flv',
+  '.wmv',
+  '.mpeg',
+  '.3gp'
+};
+const _imageExtensions = {
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.webp',
+  '.tiff',
+  '.tif',
+  '.bmp',
+  '.gif',
+  '.ico',
+  '.svg'
+};
+const _audioExtensions = {
+  '.mp3',
+  '.flac',
+  '.wav',
+  '.aac',
+  '.ogg',
+  '.wma',
+  '.m4a',
+  '.opus'
+};
 
-const _videoFormats = ['MP4', 'MKV', 'MOV', 'AVI', 'WebM', 'FLV', 'WMV', 'MPEG', '3GP'];
-const _imageFormats = ['JPEG', 'PNG', 'WebP', 'TIFF', 'BMP', 'GIF', 'ICO', 'SVG'];
-const _audioFormats = ['MP3', 'FLAC', 'WAV', 'AAC', 'OGG', 'WMA', 'M4A', 'OPUS'];
+const _videoFormats = [
+  'MP4',
+  'MKV',
+  'MOV',
+  'AVI',
+  'WebM',
+  'FLV',
+  'WMV',
+  'MPEG',
+  '3GP'
+];
+const _imageFormats = [
+  'JPEG',
+  'PNG',
+  'WebP',
+  'TIFF',
+  'BMP',
+  'GIF',
+  'ICO',
+  'SVG'
+];
+const _audioFormats = [
+  'MP3',
+  'FLAC',
+  'WAV',
+  'AAC',
+  'OGG',
+  'WMA',
+  'M4A',
+  'OPUS'
+];
 
 class FormatSelector extends StatefulWidget {
   final AppStrings strings;
@@ -76,7 +134,8 @@ class _FormatSelectorState extends State<FormatSelector> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 240, maxWidth: 560),
+                  constraints:
+                      const BoxConstraints(minWidth: 240, maxWidth: 560),
                   child: Text(
                     widget.strings.outputFormat,
                     style: const TextStyle(
@@ -144,7 +203,10 @@ class _FormatSelectorState extends State<FormatSelector> {
                 onOptionsChanged: _updateOptions,
                 selectedFiles: widget.selectedFiles,
               ),
-            if (!hasVideo && !hasImage && !hasAudio && widget.selectedFiles.isNotEmpty)
+            if (!hasVideo &&
+                !hasImage &&
+                !hasAudio &&
+                widget.selectedFiles.isNotEmpty)
               Text(
                 widget.strings.unsupportedFileType,
                 style: const TextStyle(color: Color(0xFFB35A00), fontSize: 14),
@@ -177,6 +239,8 @@ class _OverwriteToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      hoverColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(999),
       onTap: () => onChanged(!value),
       child: Container(
@@ -212,7 +276,8 @@ class _FormatGroup extends StatelessWidget {
   final AppStrings strings;
   final ConversionOptions Function(String format) getOptions;
   final ValueChanged<String> onConvert;
-  final void Function(String format, ConversionOptions options) onOptionsChanged;
+  final void Function(String format, ConversionOptions options)
+      onOptionsChanged;
   final List<String> selectedFiles;
 
   const _FormatGroup({

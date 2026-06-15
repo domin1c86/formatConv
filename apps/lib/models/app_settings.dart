@@ -4,9 +4,37 @@ import '../l10n/app_strings.dart';
 
 enum AppThemeChoice { light, dark }
 
-const supportedVideoFormats = ['MP4', 'MKV', 'MOV', 'AVI', 'WebM', 'FLV', 'WMV', 'MPEG', '3GP'];
-const supportedImageFormats = ['JPEG', 'PNG', 'WebP', 'TIFF', 'BMP', 'GIF', 'ICO', 'SVG'];
-const supportedAudioFormats = ['MP3', 'FLAC', 'WAV', 'AAC', 'OGG', 'WMA', 'M4A', 'OPUS'];
+const supportedVideoFormats = [
+  'MP4',
+  'MKV',
+  'MOV',
+  'AVI',
+  'WebM',
+  'FLV',
+  'WMV',
+  'MPEG',
+  '3GP'
+];
+const supportedImageFormats = [
+  'JPEG',
+  'PNG',
+  'WebP',
+  'TIFF',
+  'BMP',
+  'GIF',
+  'ICO',
+  'SVG'
+];
+const supportedAudioFormats = [
+  'MP3',
+  'FLAC',
+  'WAV',
+  'AAC',
+  'OGG',
+  'WMA',
+  'M4A',
+  'OPUS'
+];
 
 const defaultThemeTokens = {
   'background': '#F5F5F7',
@@ -50,8 +78,9 @@ class AppSettings {
     this.themeJson = '',
   });
 
-  String get effectiveThemeJson =>
-      themeJson.isEmpty ? const JsonEncoder.withIndent('  ').convert(defaultThemeTokens) : themeJson;
+  String get effectiveThemeJson => themeJson.isEmpty
+      ? const JsonEncoder.withIndent('  ').convert(defaultThemeTokens)
+      : themeJson;
 
   AppSettings copyWith({
     AppLanguage? language,
@@ -72,7 +101,8 @@ class AppSettings {
       language: language ?? this.language,
       theme: theme ?? this.theme,
       fontFamily: fontFamily ?? this.fontFamily,
-      defaultOutputDirectory: defaultOutputDirectory ?? this.defaultOutputDirectory,
+      defaultOutputDirectory:
+          defaultOutputDirectory ?? this.defaultOutputDirectory,
       askBeforeConvert: askBeforeConvert ?? this.askBeforeConvert,
       namingTemplate: namingTemplate ?? this.namingTemplate,
       overwriteSource: overwriteSource ?? this.overwriteSource,
@@ -125,9 +155,12 @@ class AppSettings {
       namingTemplate: json['namingTemplate'] as String? ?? r'$name$_1',
       overwriteSource: json['overwriteSource'] as bool? ?? false,
       gpuAcceleration: json['gpuAcceleration'] as bool? ?? false,
-      visibleVideoFormats: readSet('visibleVideoFormats', supportedVideoFormats),
-      visibleImageFormats: readSet('visibleImageFormats', supportedImageFormats),
-      visibleAudioFormats: readSet('visibleAudioFormats', supportedAudioFormats),
+      visibleVideoFormats:
+          readSet('visibleVideoFormats', supportedVideoFormats),
+      visibleImageFormats:
+          readSet('visibleImageFormats', supportedImageFormats),
+      visibleAudioFormats:
+          readSet('visibleAudioFormats', supportedAudioFormats),
       developerMode: json['developerMode'] as bool? ?? false,
       themeJson: json['themeJson'] as String? ?? '',
     );

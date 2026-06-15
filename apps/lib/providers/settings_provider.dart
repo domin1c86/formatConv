@@ -1,8 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/app_settings.dart';
 import '../models/conversion_result.dart';
@@ -12,8 +13,8 @@ final settingsProvider = ChangeNotifierProvider<SettingsController>((ref) {
 });
 
 class SettingsController extends ChangeNotifier {
-  static const _settingsKey = 'formatconv.settings.v1';
-  static const _historyKey = 'formatconv.history.v1';
+  static const _settingsFileName = 'settings.json';
+  static const _historyFileName = 'history.json';
   static const _historyLimit = 100;
 
   AppSettings _settings = const AppSettings();
@@ -25,13 +26,13 @@ class SettingsController extends ChangeNotifier {
   bool get loaded => _loaded;
 
   Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final settingsRaw = prefs.getString(_settingsKey);
-    final historyRaw = prefs.getString(_historyKey);
+    final settingsRaw = await _readFile(_settingsFileName);
+    final historyRaw = await _readFile(_historyFileName);
 
     if (settingsRaw != null) {
       try {
-        _settings = AppSettings.fromJson(jsonDecode(settingsRaw) as Map<String, dynamic>);
+        _settings = AppSettings.fromJson(
+            jsonDecode(settingsRaw) as Map<String, dynamic>);
       } catch (_) {
         _settings = const AppSettings();
       }
@@ -56,8 +57,7 @@ class SettingsController extends ChangeNotifier {
   Future<void> update(AppSettings settings) async {
     _settings = settings;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_settingsKey, jsonEncode(_settings.toJson()));
+    await _writeFile(_settingsFileName, jsonEncode(_settings.toJson()));
   }
 
   Future<void> toggleFormat(String type, String format, bool enabled) async {
@@ -68,11 +68,14 @@ class SettingsController extends ChangeNotifier {
     }
 
     if (type == 'video') {
-      await update(_settings.copyWith(visibleVideoFormats: next(_settings.visibleVideoFormats)));
+      await update(_settings.copyWith(
+          visibleVideoFormats: next(_settings.visibleVideoFormats)));
     } else if (type == 'image') {
-      await update(_settings.copyWith(visibleImageFormats: next(_settings.visibleImageFormats)));
+      await update(_settings.copyWith(
+          visibleImageFormats: next(_settings.visibleImageFormats)));
     } else {
-      await update(_settings.copyWith(visibleAudioFormats: next(_settings.visibleAudioFormats)));
+      await update(_settings.copyWith(
+          visibleAudioFormats: next(_settings.visibleAudioFormats)));
     }
   }
 
@@ -82,7 +85,8 @@ class SettingsController extends ChangeNotifier {
       if (decoded is! Map<String, dynamic>) {
         return 'Theme JSON must be an object.';
       }
-      await update(_settings.copyWith(themeJson: const JsonEncoder.withIndent('  ').convert(decoded)));
+      await update(_settings.copyWith(
+          themeJson: const JsonEncoder.withIndent('  ').convert(decoded)));
       return null;
     } catch (e) {
       return 'Invalid JSON: $e';
@@ -92,9 +96,8 @@ class SettingsController extends ChangeNotifier {
   Future<void> addHistory(ConversionResult result) async {
     _history = [result, ..._history].take(_historyLimit).toList();
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _historyKey,
+    await _writeFile(
+      _historyFileName,
       jsonEncode(_history.map((result) => result.toJson()).toList()),
     );
   }
@@ -103,8 +106,39 @@ class SettingsController extends ChangeNotifier {
     _settings = const AppSettings();
     _history = [];
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_settingsKey);
-    await prefs.remove(_historyKey);
+    await _deleteFile(_settingsFileName);
+    await _deleteFile(_historyFileName);
+  }
+
+  Future<String?> _readFile(String fileName) async {
+    try {
+      final file = File(await _storagePath(fileName));
+      if (!await file.exists()) return null;
+      return file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeFile(String fileName, String content) async {
+    final file = File(await _storagePath(fileName));
+    await file.parent.create(recursive: true);
+    await file.writeAsString(content);
+  }
+
+  Future<void> _deleteFile(String fileName) async {
+    try {
+      final file = File(await _storagePath(fileName));
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  Future<String> _storagePath(String fileName) async {
+    final baseDir = Platform.environment['APPDATA'] ??
+        Platform.environment['LOCALAPPDATA'] ??
+        Directory.current.path;
+    return p.join(baseDir, 'FormatConv', fileName);
   }
 }

@@ -35,37 +35,40 @@ typedef FreeStringDart = void Function(Pointer<Utf8> str);
 
 class FFIHelper {
   static DynamicLibrary? _lib;
-  
+
   static DynamicLibrary get lib {
     if (_lib != null) return _lib!;
-    
+
     if (Platform.isWindows) {
       _lib = DynamicLibrary.open('format_conv.dll');
     } else {
       throw UnsupportedError('Only Windows is supported');
     }
-    
+
     return _lib!;
   }
-  
-  static final GetVersionDart getVersion = lib
-      .lookupFunction<GetVersionNative, GetVersionDart>('getVersion');
-  
-  static final GetSupportedFormatsDart getSupportedFormats = lib
-      .lookupFunction<GetSupportedFormatsNative, GetSupportedFormatsDart>('getSupportedFormats');
-  
-  static final DetectFormatDart detectFormat = lib
-      .lookupFunction<DetectFormatNative, DetectFormatDart>('detectFormat');
-  
-  static final ConvertFileDart convertFile = lib
-      .lookupFunction<ConvertFileNative, ConvertFileDart>('convertFile');
-  
-  static final GetConversionStatusDart getConversionStatus = lib
-      .lookupFunction<GetConversionStatusNative, GetConversionStatusDart>('getConversionStatus');
-  
-  static final CancelConversionDart cancelConversion = lib
-      .lookupFunction<CancelConversionNative, CancelConversionDart>('cancelConversion');
-  
-  static final FreeStringDart freeString = lib
-      .lookupFunction<FreeStringNative, FreeStringDart>('freeString');
+
+  static final GetVersionDart getVersion =
+      lib.lookupFunction<GetVersionNative, GetVersionDart>('getVersion');
+
+  static final GetSupportedFormatsDart getSupportedFormats =
+      lib.lookupFunction<GetSupportedFormatsNative, GetSupportedFormatsDart>(
+          'getSupportedFormats');
+
+  static final DetectFormatDart detectFormat =
+      lib.lookupFunction<DetectFormatNative, DetectFormatDart>('detectFormat');
+
+  static final ConvertFileDart convertFile =
+      lib.lookupFunction<ConvertFileNative, ConvertFileDart>('convertFile');
+
+  static final GetConversionStatusDart getConversionStatus =
+      lib.lookupFunction<GetConversionStatusNative, GetConversionStatusDart>(
+          'getConversionStatus');
+
+  static final CancelConversionDart cancelConversion =
+      lib.lookupFunction<CancelConversionNative, CancelConversionDart>(
+          'cancelConversion');
+
+  static final FreeStringDart freeString =
+      lib.lookupFunction<FreeStringNative, FreeStringDart>('freeString');
 }

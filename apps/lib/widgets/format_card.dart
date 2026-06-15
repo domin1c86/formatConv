@@ -56,6 +56,9 @@ class FormatCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 InkWell(
+                  mouseCursor: SystemMouseCursors.click,
+                  hoverColor:
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                   onTap: onTap,
                   child: Padding(
@@ -183,6 +186,8 @@ class _QualityChip extends StatelessWidget {
     final primary = Theme.of(context).colorScheme.primary;
 
     return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      hoverColor: primary.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
       child: Container(

@@ -34,11 +34,11 @@ class ConversionOptions {
   }
 
   Map<String, dynamic> toJson() => {
-    'lossless': lossless,
-    'quality': quality,
-    'codec': codec,
-    'bitrate': bitrate,
-    'compression_algorithm': compressionAlgorithm,
-    'overwrite': overwrite,
-  };
+        'lossless': lossless,
+        'quality': quality,
+        'codec': codec,
+        'bitrate': bitrate,
+        'compression_algorithm': compressionAlgorithm,
+        'overwrite': overwrite,
+      };
 }

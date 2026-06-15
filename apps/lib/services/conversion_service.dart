@@ -16,40 +16,43 @@ typedef _ProgressCallbackNative = Void Function(
 );
 
 class ConversionService {
-  static final Map<int, NativeCallable<_ProgressCallbackNative>> _activeCallbacks = {};
+  static final Map<int, NativeCallable<_ProgressCallbackNative>>
+      _activeCallbacks = {};
   String getVersion() {
     final ptr = FFIHelper.getVersion();
     final version = ptr.toDartString();
     FFIHelper.freeString(ptr);
     return version;
   }
-  
+
   Future<FormatList> getSupportedFormats() async {
     final ptr = FFIHelper.getSupportedFormats();
     final jsonStr = ptr.toDartString();
     FFIHelper.freeString(ptr);
-    
+
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
     return FormatList.fromJson(json);
   }
-  
+
   Future<FormatInfo?> detectFormat(String filePath) async {
     final pathPtr = filePath.toNativeUtf8();
     final ptr = FFIHelper.detectFormat(pathPtr);
     final jsonStr = ptr.toDartString();
     FFIHelper.freeString(ptr);
     calloc.free(pathPtr);
-    
+
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
     if (json.isEmpty) return null;
     return FormatInfo.fromJson(json);
   }
-  
+
   Future<int> convertFile(
     String inputPath,
     String outputPath,
     ConversionOptions options,
-    Function(int id, double progress, int processed, int total, int status, String? error)? onProgress,
+    Function(int id, double progress, int processed, int total, int status,
+            String? error)?
+        onProgress,
   ) async {
     final inputPtr = inputPath.toNativeUtf8();
     final outputPtr = outputPath.toNativeUtf8();
@@ -60,7 +63,8 @@ class ConversionService {
 
     if (onProgress != null) {
       nativeCallable = NativeCallable<_ProgressCallbackNative>.listener(
-        (int id, double progress, int processed, int total, int status, Pointer<Utf8> error) {
+        (int id, double progress, int processed, int total, int status,
+            Pointer<Utf8> error) {
           String? errorStr;
           if (error != nullptr) {
             try {
@@ -75,7 +79,8 @@ class ConversionService {
       callbackPtr = nativeCallable.nativeFunction.cast<Void>();
     }
 
-    final result = FFIHelper.convertFile(inputPtr, outputPtr, optionsPtr, callbackPtr);
+    final result =
+        FFIHelper.convertFile(inputPtr, outputPtr, optionsPtr, callbackPtr);
 
     calloc.free(inputPtr);
     calloc.free(outputPtr);
@@ -93,17 +98,17 @@ class ConversionService {
   static void disposeProgressCallback(int conversionId) {
     _activeCallbacks.remove(conversionId)?.close();
   }
-  
+
   Future<ConversionStatus?> getConversionStatus(int conversionId) async {
     final ptr = FFIHelper.getConversionStatus(conversionId);
     final jsonStr = ptr.toDartString();
     FFIHelper.freeString(ptr);
-    
+
     final json = jsonDecode(jsonStr) as Map<String, dynamic>;
     if (json.isEmpty) return null;
     return ConversionStatus.fromJson(json);
   }
-  
+
   Future<bool> cancelConversion(int conversionId) async {
     final result = FFIHelper.cancelConversion(conversionId);
     return result == 1;

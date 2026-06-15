@@ -104,13 +104,15 @@ class _FileInfoCardState extends State<_FileInfoCard> {
     final exists = file.existsSync();
     final size = exists ? file.lengthSync() : 0;
     final sizeStr = _formatSize(size);
-    final ext = p.extension(widget.filePath).replaceFirst('.', '').toUpperCase();
+    final ext =
+        p.extension(widget.filePath).replaceFirst('.', '').toUpperCase();
     final name = p.basename(widget.filePath);
 
     final width = _formatInfo?.properties['width'];
     final height = _formatInfo?.properties['height'];
     final duration = _formatInfo?.properties['duration'];
-    final resolution = (width != null && height != null) ? '${width}x$height' : null;
+    final resolution =
+        (width != null && height != null) ? '${width}x$height' : null;
     final durationStr = duration != null ? _formatDuration(duration) : null;
 
     return Draggable<List<String>>(
@@ -136,7 +138,8 @@ class _FileInfoCardState extends State<_FileInfoCard> {
     );
   }
 
-  String _details(String ext, String sizeStr, String? resolution, String? durationStr) {
+  String _details(
+      String ext, String sizeStr, String? resolution, String? durationStr) {
     return [
       ext,
       sizeStr,
@@ -187,7 +190,8 @@ class _PreviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.insert_drive_file, size: 20, color: Color(0xFF7A7A7A)),
+              const Icon(Icons.insert_drive_file,
+                  size: 20, color: Color(0xFF7A7A7A)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -234,7 +238,9 @@ class _ResultCard extends StatelessWidget {
         children: [
           Icon(
             result.success ? Icons.check_circle : Icons.error,
-            color: result.success ? const Color(0xFF15803D) : const Color(0xFFB00020),
+            color: result.success
+                ? const Color(0xFF15803D)
+                : const Color(0xFFB00020),
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -250,7 +256,8 @@ class _ResultCard extends StatelessWidget {
                 if (!result.success && result.error != null)
                   Text(
                     result.error!,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFB00020)),
+                    style:
+                        const TextStyle(fontSize: 12, color: Color(0xFFB00020)),
                   ),
               ],
             ),
