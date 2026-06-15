@@ -11,13 +11,16 @@ $RepoRoot = Resolve-Path (Join-Path $FlutterDir "..")
 $GoDir = Join-Path $RepoRoot "native"
 $DllPath = Join-Path $FlutterDir "format_conv.dll"
 
-Write-Host "Building Go shared library..."
+Write-Host "Building Go shared library (x64)..."
 Push-Location $GoDir
 try {
   $env:GOOS = "windows"
   $env:GOARCH = "amd64"
   $env:CGO_ENABLED = "1"
   go build -buildmode=c-shared -o $DllPath .
+  if ($LASTEXITCODE -ne 0) {
+    throw "Go shared library build failed with exit code $LASTEXITCODE."
+  }
 } finally {
   Pop-Location
 }
@@ -26,6 +29,9 @@ Write-Host "Building Flutter Windows app ($Mode)..."
 Push-Location $FlutterDir
 try {
   flutter build windows --$Mode
+  if ($LASTEXITCODE -ne 0) {
+    throw "Flutter Windows build failed with exit code $LASTEXITCODE."
+  }
 } finally {
   Pop-Location
 }

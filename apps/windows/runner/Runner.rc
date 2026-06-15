@@ -2,4 +2,3 @@
 #include "resource.h"
 
 // IDI_APP_ICON ICON "app_icon.ico"
-1 RT_MANIFEST "runner.exe.manifest"

@@ -4,11 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/app_settings.dart';
 import '../models/conversion_options.dart';
+import '../models/conversion_result.dart';
 import '../models/conversion_status.dart';
 import '../services/conversion_service.dart';
 import '../utils/format_descriptions.dart';
-import '../widgets/preview_panel.dart';
 
 final conversionProvider = ChangeNotifierProvider<ConversionProvider>((ref) {
   return ConversionProvider();
@@ -37,7 +38,18 @@ class ConversionProvider extends ChangeNotifier {
       formatDescriptions.keys.map((k) => k.toUpperCase()).toSet();
 
   void selectFiles(List<String> files) {
-    _selectedFiles = files;
+    addFiles(files, replace: true);
+  }
+
+  void addFiles(List<String> files, {bool replace = false}) {
+    final normalized = files.where((file) => file.trim().isNotEmpty).toList();
+    if (replace) {
+      _selectedFiles = [];
+    }
+    _selectedFiles = [
+      ..._selectedFiles,
+      ...normalized.where((file) => !_selectedFiles.contains(file)),
+    ];
     _results.clear();
     notifyListeners();
   }
@@ -65,6 +77,7 @@ class ConversionProvider extends ChangeNotifier {
     final dir = p.dirname(outputPath);
     final testFile = File(p.join(dir, '.formatconv_write_test'));
     try {
+      Directory(dir).createSync(recursive: true);
       testFile.writeAsStringSync('');
       testFile.deleteSync();
       return true;
@@ -135,8 +148,15 @@ class ConversionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> startConversion(String format, ConversionOptions options) async {
-    if (_selectedFiles.isEmpty) return;
+  Future<void> startConversion(
+    String format,
+    ConversionOptions options, {
+    List<String>? files,
+    AppSettings? settings,
+    ValueChanged<ConversionResult>? onResult,
+  }) async {
+    final targetFiles = files ?? _selectedFiles;
+    if (targetFiles.isEmpty) return;
 
     final normalizedFormat = format.toUpperCase();
     if (!supportedFormats.contains(normalizedFormat)) {
@@ -152,43 +172,76 @@ class ConversionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      for (final file in _selectedFiles) {
+      for (final file in targetFiles) {
+        final startedAt = DateTime.now();
         if (!File(file).existsSync()) {
-          _results[file] = ConversionResult(
+          final result = ConversionResult(
+            inputPath: file,
             outputPath: '',
             success: false,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
             error: _friendlyError(file, 'not_found'),
           );
+          _results[file] = ConversionResult(
+            inputPath: result.inputPath,
+            outputPath: result.outputPath,
+            success: result.success,
+            startedAt: result.startedAt,
+            finishedAt: result.finishedAt,
+            error: result.error,
+          );
+          onResult?.call(result);
           continue;
         }
 
         if (!_validateFile(file)) {
-          _results[file] = ConversionResult(
+          final result = ConversionResult(
+            inputPath: file,
             outputPath: '',
             success: false,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
             error: _friendlyError(file, 'permission_read'),
           );
+          _results[file] = result;
+          onResult?.call(result);
           continue;
         }
 
-        final outputPath = _generateOutputPath(file, normalizedFormat, options.overwrite);
+        final outputPath = _generateOutputPath(
+          file,
+          normalizedFormat,
+          options.overwrite || (settings?.overwriteSource ?? false),
+          settings,
+        );
 
         if (!_checkOutputWritable(outputPath)) {
-          _results[file] = ConversionResult(
+          final result = ConversionResult(
+            inputPath: file,
             outputPath: outputPath,
             success: false,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
             error: _friendlyError('', 'permission_write'),
           );
+          _results[file] = result;
+          onResult?.call(result);
           continue;
         }
 
         final inputSize = File(file).lengthSync();
         if (!await _checkDiskSpace(outputPath, inputSize)) {
-          _results[file] = ConversionResult(
+          final result = ConversionResult(
+            inputPath: file,
             outputPath: outputPath,
             success: false,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
             error: _friendlyError('', 'no_space'),
           );
+          _results[file] = result;
+          onResult?.call(result);
           continue;
         }
 
@@ -217,22 +270,32 @@ class ConversionProvider extends ChangeNotifier {
                 conversionStatus.status == 'processing');
 
             final failed = conversionStatus?.status != 'completed';
-            _results[file] = ConversionResult(
+            final result = ConversionResult(
+              inputPath: file,
               outputPath: outputPath,
               success: !failed,
+              startedAt: startedAt,
+              finishedAt: DateTime.now(),
               error: failed
                   ? _mapBackendError(conversionStatus?.error)
                   : null,
             );
+            _results[file] = result;
+            onResult?.call(result);
           } finally {
             ConversionService.disposeProgressCallback(conversionId);
           }
         } catch (e) {
-          _results[file] = ConversionResult(
+          final result = ConversionResult(
+            inputPath: file,
             outputPath: outputPath,
             success: false,
+            startedAt: startedAt,
+            finishedAt: DateTime.now(),
             error: _mapBackendError(e.toString()),
           );
+          _results[file] = result;
+          onResult?.call(result);
         }
       }
     } catch (e) {
@@ -276,17 +339,30 @@ class ConversionProvider extends ChangeNotifier {
     }
   }
 
-  String _generateOutputPath(String inputPath, String format, bool overwrite) {
-    final dir = p.dirname(inputPath);
+  String _generateOutputPath(
+    String inputPath,
+    String format,
+    bool overwrite,
+    AppSettings? settings,
+  ) {
+    final configuredDir = settings?.defaultOutputDirectory ?? '';
+    final dir = configuredDir.isEmpty ? p.dirname(inputPath) : configuredDir;
     final baseName = p.basenameWithoutExtension(inputPath);
     final ext = format.toLowerCase();
-    var outputPath = p.join(dir, '$baseName.$ext');
+    final template = settings?.namingTemplate ?? r'$name$_1';
+    final outputBaseName = template.contains(r'$name$')
+        ? template.replaceAll(r'$name$', baseName).replaceAll(r'$num$', '1')
+        : baseName;
+    var outputPath = p.join(dir, '$outputBaseName.$ext');
 
     if (overwrite) return outputPath;
 
     int suffix = 1;
     while (File(outputPath).existsSync()) {
-      outputPath = p.join(dir, '${baseName}_$suffix.$ext');
+      final generatedName = template.contains(r'$name$')
+          ? template.replaceAll(r'$name$', baseName).replaceAll(r'$num$', '$suffix')
+          : '${baseName}_$suffix';
+      outputPath = p.join(dir, '$generatedName.$ext');
       suffix++;
     }
     return outputPath;
