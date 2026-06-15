@@ -97,14 +97,14 @@ class FormatCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: SliderTheme(
-                                data: SliderThemeData(
+                                data: const SliderThemeData(
                                   activeTrackColor: Colors.blue,
                                   thumbColor: Colors.blue,
                                   trackHeight: 2,
-                                  thumbShape: const RoundSliderThumbShape(
+                                  thumbShape: RoundSliderThumbShape(
                                     enabledThumbRadius: 6,
                                   ),
-                                  overlayShape: const RoundSliderOverlayShape(
+                                  overlayShape: RoundSliderOverlayShape(
                                     overlayRadius: 14,
                                   ),
                                 ),
