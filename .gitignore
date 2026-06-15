@@ -3,6 +3,8 @@ docs/
 mockup.html
 CLAUDE.md
 AGENT.md
+AGENTS.md
+DESIGN.md
 
 # Flutter
 format_conv/.dart_tool/

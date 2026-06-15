@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/conversion_options.dart';
 import '../utils/format_descriptions.dart';
 
 class FormatCard extends StatelessWidget {
+  final AppStrings strings;
   final String format;
   final List<String> draggedFiles;
   final ConversionOptions options;
@@ -12,6 +14,7 @@ class FormatCard extends StatelessWidget {
 
   const FormatCard({
     super.key,
+    required this.strings,
     required this.format,
     required this.draggedFiles,
     required this.options,
@@ -24,7 +27,7 @@ class FormatCard extends StatelessWidget {
     final desc = formatDescriptions[format];
     final codecs = formatCodecs[format];
     final tooltipText = desc != null
-        ? '${desc.description}\n\nFeatures:\n${desc.features.map((f) => '• $f').join('\n')}'
+        ? '${desc.description}\n\nFeatures:\n${desc.features.map((f) => '- $f').join('\n')}'
         : format;
 
     return DragTarget<List<String>>(
@@ -32,17 +35,19 @@ class FormatCard extends StatelessWidget {
       onAcceptWithDetails: (details) => onTap(),
       builder: (context, candidateData, rejectedData) {
         final isHovering = candidateData.isNotEmpty;
+        final primary = Theme.of(context).colorScheme.primary;
 
         return Tooltip(
           message: tooltipText,
           waitDuration: const Duration(milliseconds: 400),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isHovering ? Colors.blue[50] : Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: isHovering ? Colors.blue : Colors.grey[300]!,
+                color: isHovering ? primary : const Color(0xFFE0E0E0),
                 width: isHovering ? 2 : 1,
               ),
             ),
@@ -50,111 +55,109 @@ class FormatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: onTap,
-                  behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Text(
-                      '-> $format',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            format,
+                            style: const TextStyle(
+                              fontSize: 21,
+                              height: 1.2,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1D1D1F),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 20,
+                          color: primary,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _QualityChip(
-                            label: 'Lossless',
-                            selected: options.lossless,
-                            onTap: () => onOptionsChanged(
-                              options.copyWith(lossless: true, quality: 100),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          _QualityChip(
-                            label: 'Lossy',
-                            selected: !options.lossless,
-                            onTap: () => onOptionsChanged(
-                              options.copyWith(lossless: false),
-                            ),
-                          ),
-                        ],
+                const SizedBox(height: 4),
+                Text(
+                  '${strings.convertTo} $format',
+                  style: const TextStyle(
+                    color: Color(0xFF7A7A7A),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _QualityChip(
+                      label: strings.lossless,
+                      selected: options.lossless,
+                      onTap: () => onOptionsChanged(
+                        options.copyWith(lossless: true, quality: 100),
                       ),
-                      if (!options.lossless) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SliderTheme(
-                                data: const SliderThemeData(
-                                  activeTrackColor: Colors.blue,
-                                  thumbColor: Colors.blue,
-                                  trackHeight: 2,
-                                  thumbShape: RoundSliderThumbShape(
-                                    enabledThumbRadius: 6,
-                                  ),
-                                  overlayShape: RoundSliderOverlayShape(
-                                    overlayRadius: 14,
-                                  ),
-                                ),
-                                child: Slider(
-                                  value: options.quality.toDouble(),
-                                  min: 0,
-                                  max: 100,
-                                  divisions: 10,
-                                  onChanged: (v) => onOptionsChanged(
-                                    options.copyWith(quality: v.round()),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 36,
-                              child: Text(
-                                '${options.quality}%',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (codecs != null && codecs.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: codecs.map((codec) {
-                              final selected = options.codec == codec;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 4),
-                                child: _QualityChip(
-                                  label: codec,
-                                  selected: selected,
-                                  onTap: () => onOptionsChanged(
-                                    options.copyWith(
-                                      codec: selected ? null : codec,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                    ),
+                    _QualityChip(
+                      label: strings.lossy,
+                      selected: !options.lossless,
+                      onTap: () => onOptionsChanged(
+                        options.copyWith(lossless: false),
+                      ),
+                    ),
+                  ],
+                ),
+                if (!options.lossless) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Slider(
+                          value: options.quality.toDouble(),
+                          min: 0,
+                          max: 100,
+                          divisions: 10,
+                          onChanged: (v) => onOptionsChanged(
+                            options.copyWith(quality: v.round()),
                           ),
                         ),
-                      ],
+                      ),
+                      SizedBox(
+                        width: 48,
+                        child: Text(
+                          '${options.quality}%',
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
                     ],
                   ),
-                ),
+                ],
+                if (codecs != null && codecs.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: codecs.map((codec) {
+                        final selected = options.codec == codec;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _QualityChip(
+                            label: codec,
+                            selected: selected,
+                            onTap: () => onOptionsChanged(
+                              options.copyWith(codec: selected ? null : codec),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -177,23 +180,27 @@ class _QualityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        constraints: const BoxConstraints(minHeight: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? Colors.blue : Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          color: selected ? primary : const Color(0xFFFAFAFC),
+          borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? Colors.blue : Colors.grey[300]!,
+            color: selected ? primary : const Color(0xFFE0E0E0),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: selected ? Colors.white : Colors.black87,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: selected ? Colors.white : const Color(0xFF333333),
           ),
         ),
       ),

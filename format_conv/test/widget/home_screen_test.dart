@@ -10,9 +10,11 @@ void main() {
         child: MaterialApp(home: HomeScreen()),
       ),
     );
-    expect(find.text('Format Converter'), findsOneWidget);
+    expect(find.text('FormatConv'), findsOneWidget);
     expect(find.text('Select Files'), findsOneWidget);
     expect(find.text('Select Output Format'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('中文'), findsOneWidget);
   });
 
   testWidgets('Home screen shows empty state message', (WidgetTester tester) async {

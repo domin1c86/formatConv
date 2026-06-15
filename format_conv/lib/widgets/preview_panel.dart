@@ -3,15 +3,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_strings.dart';
 import '../models/format_info.dart';
 import '../services/conversion_service.dart';
 
 class FilePreviewPanel extends StatelessWidget {
+  final AppStrings strings;
   final List<String> selectedFiles;
   final Map<String, ConversionResult> results;
 
   const FilePreviewPanel({
     super.key,
+    required this.strings,
     required this.selectedFiles,
     this.results = const {},
   });
@@ -22,37 +25,35 @@ class FilePreviewPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (selectedFiles.isNotEmpty) ...[
-            Text(
-              'Selected Files',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...selectedFiles.map((f) => _FileInfoCard(filePath: f)),
-          ],
-          if (results.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Conversion Results',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...results.entries.map((e) => _ResultCard(
-              inputPath: e.key,
-              result: e.value,
-            )),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (selectedFiles.isNotEmpty) ...[
+          Text(
+            strings.selectedFiles,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 10),
+          ...selectedFiles.map((f) => _FileInfoCard(filePath: f)),
         ],
-      ),
+        if (results.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text(
+            strings.conversionResults,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 10),
+          ...results.entries.map((e) => _ResultCard(
+                strings: strings,
+                inputPath: e.key,
+                result: e.value,
+              )),
+        ],
+      ],
     );
   }
 }
@@ -115,58 +116,33 @@ class _FileInfoCardState extends State<_FileInfoCard> {
     return Draggable<List<String>>(
       data: [widget.filePath],
       feedback: Material(
-        elevation: 4,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: Colors.blue[100],
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.insert_drive_file, size: 16, color: Colors.blue[700]),
-              const SizedBox(width: 6),
-              Text(name, style: const TextStyle(fontSize: 12)),
-            ],
-          ),
+        color: Colors.transparent,
+        child: _PreviewCard(
+          name: name,
+          details: _details(ext, sizeStr, resolution, durationStr),
         ),
       ),
       childWhenDragging: Opacity(
-        opacity: 0.4,
-        child: _buildCard(name, ext, sizeStr, resolution, durationStr),
+        opacity: 0.45,
+        child: _PreviewCard(
+          name: name,
+          details: _details(ext, sizeStr, resolution, durationStr),
+        ),
       ),
-      child: _buildCard(name, ext, sizeStr, resolution, durationStr),
+      child: _PreviewCard(
+        name: name,
+        details: _details(ext, sizeStr, resolution, durationStr),
+      ),
     );
   }
 
-  Widget _buildCard(String name, String ext, String sizeStr, String? resolution, String? durationStr) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.insert_drive_file, size: 20, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              [ext, sizeStr, if (resolution != null) resolution, if (durationStr != null) durationStr].join('  •  '),
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _details(String ext, String sizeStr, String? resolution, String? durationStr) {
+    return [
+      ext,
+      sizeStr,
+      if (resolution != null) resolution,
+      if (durationStr != null) durationStr,
+    ].join(' - ');
   }
 
   String _formatSize(int bytes) {
@@ -187,51 +163,105 @@ class _FileInfoCardState extends State<_FileInfoCard> {
   }
 }
 
-class _ResultCard extends StatelessWidget {
-  final String inputPath;
-  final ConversionResult result;
+class _PreviewCard extends StatelessWidget {
+  final String name;
+  final String details;
 
-  const _ResultCard({required this.inputPath, required this.result});
+  const _PreviewCard({
+    required this.name,
+    required this.details,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(
-              result.success ? Icons.check_circle : Icons.error,
-              color: result.success ? Colors.green : Colors.red,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFC),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insert_drive_file, size: 20, color: Color(0xFF7A7A7A)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            details,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF7A7A7A)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultCard extends StatelessWidget {
+  final AppStrings strings;
+  final String inputPath;
+  final ConversionResult result;
+
+  const _ResultCard({
+    required this.strings,
+    required this.inputPath,
+    required this.result,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFC),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            result.success ? Icons.check_circle : Icons.error,
+            color: result.success ? const Color(0xFF15803D) : const Color(0xFFB00020),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.basename(inputPath),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (!result.success && result.error != null)
                   Text(
-                    p.basename(inputPath),
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
+                    result.error!,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFB00020)),
                   ),
-                  if (!result.success && result.error != null)
-                    Text(
-                      result.error!,
-                      style: TextStyle(fontSize: 12, color: Colors.red[600]),
-                    ),
-                ],
-              ),
+              ],
             ),
-            if (result.success)
-              IconButton(
-                icon: const Icon(Icons.open_in_new, size: 20),
-                tooltip: 'Open with system default app',
-                onPressed: () => _openFile(result.outputPath),
-              ),
-          ],
-        ),
+          ),
+          if (result.success)
+            IconButton(
+              icon: const Icon(Icons.open_in_new, size: 20),
+              tooltip: strings.openFile,
+              onPressed: () => _openFile(result.outputPath),
+            ),
+        ],
       ),
     );
   }
@@ -239,10 +269,6 @@ class _ResultCard extends StatelessWidget {
   void _openFile(String path) {
     if (Platform.isWindows) {
       Process.run('start', ['', path], runInShell: true);
-    } else if (Platform.isMacOS) {
-      Process.run('open', [path]);
-    } else {
-      Process.run('xdg-open', [path]);
     }
   }
 }
