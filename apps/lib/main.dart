@@ -48,7 +48,13 @@ class FormatConvApp extends ConsumerWidget {
         ? const Color(0xFF1E1E21)
         : _readColor(tokens, 'surface', Colors.white);
     final border = _readColor(tokens, 'border', const Color(0xFFE0E0E0));
-    final radius = (tokens['cardRadius'] as num?)?.toDouble() ?? 14;
+    final surfaceMuted =
+        _readColor(tokens, 'surfaceMuted', const Color(0xFFFAFAFC));
+    final hover = _readColor(tokens, 'hover', const Color(0xFFF0F7FF));
+    final muted = _readColor(tokens, 'muted', const Color(0xFF6E6E73));
+    final radius = settings.cardRadius > 0
+        ? settings.cardRadius
+        : (tokens['cardRadius'] as num?)?.toDouble() ?? 14;
     final hoverBlue = actionBlue.withValues(alpha: 0.08);
     final pressedBlue = actionBlue.withValues(alpha: 0.14);
     final clickCursor = WidgetStateProperty.all(SystemMouseCursors.click);
@@ -172,6 +178,19 @@ class FormatConvApp extends ConsumerWidget {
           side: BorderSide(color: border),
         ),
       ),
+      extensions: [
+        AppThemeTokens(
+          background: background,
+          surface: surface,
+          surfaceMuted: surfaceMuted,
+          hover: hover,
+          ink: ink,
+          muted: muted,
+          primary: actionBlue,
+          border: border,
+          cardRadius: radius,
+        ),
+      ],
     );
   }
 

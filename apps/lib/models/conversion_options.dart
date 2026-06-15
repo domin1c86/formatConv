@@ -5,6 +5,7 @@ class ConversionOptions {
   final String? bitrate;
   final String? compressionAlgorithm;
   final bool overwrite;
+  final bool gpuAcceleration;
 
   ConversionOptions({
     this.lossless = true,
@@ -13,6 +14,7 @@ class ConversionOptions {
     this.bitrate,
     this.compressionAlgorithm,
     this.overwrite = false,
+    this.gpuAcceleration = false,
   });
 
   ConversionOptions copyWith({
@@ -22,6 +24,7 @@ class ConversionOptions {
     String? bitrate,
     String? compressionAlgorithm,
     bool? overwrite,
+    bool? gpuAcceleration,
   }) {
     return ConversionOptions(
       lossless: lossless ?? this.lossless,
@@ -30,6 +33,7 @@ class ConversionOptions {
       bitrate: bitrate ?? this.bitrate,
       compressionAlgorithm: compressionAlgorithm ?? this.compressionAlgorithm,
       overwrite: overwrite ?? this.overwrite,
+      gpuAcceleration: gpuAcceleration ?? this.gpuAcceleration,
     );
   }
 
@@ -40,5 +44,6 @@ class ConversionOptions {
         'bitrate': bitrate,
         'compression_algorithm': compressionAlgorithm,
         'overwrite': overwrite,
+        'gpu_acceleration': gpuAcceleration,
       };
 }

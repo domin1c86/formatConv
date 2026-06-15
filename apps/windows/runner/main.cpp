@@ -5,8 +5,49 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+namespace {
+
+void EnableHighDpiAwareness() {
+  const HMODULE user32 = ::LoadLibraryW(L"user32.dll");
+  if (user32 != nullptr) {
+    using SetProcessDpiAwarenessContextFn =
+        BOOL(WINAPI *)(DPI_AWARENESS_CONTEXT);
+    const auto set_process_dpi_awareness_context =
+        reinterpret_cast<SetProcessDpiAwarenessContextFn>(
+            ::GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+    if (set_process_dpi_awareness_context != nullptr &&
+        set_process_dpi_awareness_context(
+            DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) {
+      ::FreeLibrary(user32);
+      return;
+    }
+    ::FreeLibrary(user32);
+  }
+
+  const HMODULE shcore = ::LoadLibraryW(L"shcore.dll");
+  if (shcore != nullptr) {
+    using SetProcessDpiAwarenessFn = HRESULT(WINAPI *)(int);
+    const auto set_process_dpi_awareness =
+        reinterpret_cast<SetProcessDpiAwarenessFn>(
+            ::GetProcAddress(shcore, "SetProcessDpiAwareness"));
+    constexpr int kProcessPerMonitorDpiAware = 2;
+    if (set_process_dpi_awareness != nullptr &&
+        SUCCEEDED(set_process_dpi_awareness(kProcessPerMonitorDpiAware))) {
+      ::FreeLibrary(shcore);
+      return;
+    }
+    ::FreeLibrary(shcore);
+  }
+
+  ::SetProcessDPIAware();
+}
+
+}  // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
+  EnableHighDpiAwareness();
+
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {

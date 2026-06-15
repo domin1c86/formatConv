@@ -120,7 +120,11 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 }
 
 func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {
-	args := []string{"-i", inputPath}
+	args := []string{}
+	if options.GPUAcceleration {
+		args = append(args, "-hwaccel", "auto")
+	}
+	args = append(args, "-i", inputPath)
 
 	if options.Lossless {
 		ext := strings.ToLower(filepath.Ext(outputPath))

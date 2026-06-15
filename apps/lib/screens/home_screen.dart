@@ -88,34 +88,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       SizedBox(
                         height: math.max(520, constraints.maxHeight * 0.48),
-                        child: _LeftPane(
-                          strings: strings,
-                          provider: provider,
-                          fileTab: _fileTab,
-                          page: _page,
-                          onFileTabChanged: (tab) => setState(() {
-                            _fileTab = tab;
-                            _page = 0;
-                          }),
-                          onPageChanged: (page) => setState(() => _page = page),
-                          onOpenSettings: () =>
-                              _showSettings(strings, settingsController),
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            fontFamily: settings.leftPaneFontFamily.isEmpty
+                                ? null
+                                : settings.leftPaneFontFamily,
+                          ),
+                          child: _LeftPane(
+                            strings: strings,
+                            provider: provider,
+                            fileTab: _fileTab,
+                            page: _page,
+                            onFileTabChanged: (tab) => setState(() {
+                              _fileTab = tab;
+                              _page = 0;
+                            }),
+                            onPageChanged: (page) =>
+                                setState(() => _page = page),
+                            onOpenSettings: () =>
+                                _showSettings(strings, settingsController),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: _RightPane(
-                          strings: strings,
-                          provider: provider,
-                          settingsController: settingsController,
-                          rightTab: _rightTab,
-                          showHistory: _showHistory,
-                          onRightTabChanged: (tab) =>
-                              setState(() => _rightTab = tab),
-                          onShowHistory: () =>
-                              setState(() => _showHistory = true),
-                          onShowCurrent: () =>
-                              setState(() => _showHistory = false),
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            fontFamily: settings.rightPaneFontFamily.isEmpty
+                                ? null
+                                : settings.rightPaneFontFamily,
+                          ),
+                          child: _RightPane(
+                            strings: strings,
+                            provider: provider,
+                            settingsController: settingsController,
+                            rightTab: _rightTab,
+                            showHistory: _showHistory,
+                            onRightTabChanged: (tab) =>
+                                setState(() => _rightTab = tab),
+                            onShowHistory: () =>
+                                setState(() => _showHistory = true),
+                            onShowCurrent: () =>
+                                setState(() => _showHistory = false),
+                          ),
                         ),
                       ),
                     ],
@@ -124,34 +139,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       SizedBox(
                         width: contentWidth * 0.34,
-                        child: _LeftPane(
-                          strings: strings,
-                          provider: provider,
-                          fileTab: _fileTab,
-                          page: _page,
-                          onFileTabChanged: (tab) => setState(() {
-                            _fileTab = tab;
-                            _page = 0;
-                          }),
-                          onPageChanged: (page) => setState(() => _page = page),
-                          onOpenSettings: () =>
-                              _showSettings(strings, settingsController),
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            fontFamily: settings.leftPaneFontFamily.isEmpty
+                                ? null
+                                : settings.leftPaneFontFamily,
+                          ),
+                          child: _LeftPane(
+                            strings: strings,
+                            provider: provider,
+                            fileTab: _fileTab,
+                            page: _page,
+                            onFileTabChanged: (tab) => setState(() {
+                              _fileTab = tab;
+                              _page = 0;
+                            }),
+                            onPageChanged: (page) =>
+                                setState(() => _page = page),
+                            onOpenSettings: () =>
+                                _showSettings(strings, settingsController),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 18),
                       Expanded(
-                        child: _RightPane(
-                          strings: strings,
-                          provider: provider,
-                          settingsController: settingsController,
-                          rightTab: _rightTab,
-                          showHistory: _showHistory,
-                          onRightTabChanged: (tab) =>
-                              setState(() => _rightTab = tab),
-                          onShowHistory: () =>
-                              setState(() => _showHistory = true),
-                          onShowCurrent: () =>
-                              setState(() => _showHistory = false),
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            fontFamily: settings.rightPaneFontFamily.isEmpty
+                                ? null
+                                : settings.rightPaneFontFamily,
+                          ),
+                          child: _RightPane(
+                            strings: strings,
+                            provider: provider,
+                            settingsController: settingsController,
+                            rightTab: _rightTab,
+                            showHistory: _showHistory,
+                            onRightTabChanged: (tab) =>
+                                setState(() => _rightTab = tab),
+                            onShowHistory: () =>
+                                setState(() => _showHistory = true),
+                            onShowCurrent: () =>
+                                setState(() => _showHistory = false),
+                          ),
                         ),
                       ),
                     ],
@@ -277,6 +307,7 @@ class _AddFilesTileState extends State<_AddFilesTile> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),
       onDragExited: (_) => setState(() => _dragging = false),
@@ -290,9 +321,9 @@ class _AddFilesTileState extends State<_AddFilesTile> {
         onExit: (_) => setState(() => _hovering = false),
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
           hoverColor: Colors.transparent,
-          splashColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+          splashColor: tokens.primary.withValues(alpha: 0.08),
           onTap: () async {
             final result =
                 await FilePicker.platform.pickFiles(allowMultiple: true);
@@ -305,15 +336,15 @@ class _AddFilesTileState extends State<_AddFilesTile> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: _dragging
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+                ? tokens.primary.withValues(alpha: 0.12)
                 : _hovering
-                    ? const Color(0xFFF0F7FF)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+                    ? tokens.hover
+                    : tokens.surface,
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
             border: Border.all(
               color: _dragging
-                  ? Theme.of(context).colorScheme.primary
-                  : const Color(0xFFE0E0E0),
+                  ? tokens.primary
+                  : tokens.border,
               width: _dragging ? 2 : 1,
             ),
           ),
@@ -323,8 +354,8 @@ class _AddFilesTileState extends State<_AddFilesTile> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F7),
-                  borderRadius: BorderRadius.circular(12),
+                  color: tokens.surfaceMuted,
+                  borderRadius: BorderRadius.circular(math.max(0, tokens.cardRadius - 2)),
                 ),
                 child: const Icon(Icons.add_rounded, size: 24),
               ),
@@ -360,8 +391,7 @@ class _AddFilesTileState extends State<_AddFilesTile> {
                           style: const TextStyle(
                             fontSize: 12,
                             height: 1.15,
-                            color: Color(0xFF6E6E73),
-                          ),
+                          ).copyWith(color: tokens.muted),
                         ),
                       ],
                     ),
@@ -405,13 +435,14 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     final tabs = _availableTabs(widget.files, widget.strings);
     final filtered = widget.files
         .where((file) => _matchesTab(file, widget.selectedTab))
         .toList();
     const pageSize = 12;
     final totalPages = math.max(1, (filtered.length / pageSize).ceil());
-    final currentPage = widget.page.clamp(0, totalPages - 1);
+    final currentPage = widget.page.clamp(0, totalPages - 1).toInt();
     final visible =
         filtered.skip(currentPage * pageSize).take(pageSize).toList();
 
@@ -426,12 +457,12 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: _dragging ? const Color(0xFFF0F7FF) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          color: _dragging ? tokens.hover : tokens.surface,
+          borderRadius: BorderRadius.circular(tokens.cardRadius + 4),
           border: Border.all(
             color: _dragging
-                ? Theme.of(context).colorScheme.primary
-                : const Color(0xFFE0E0E0),
+                ? tokens.primary
+                : tokens.border,
             width: _dragging ? 2 : 1,
           ),
         ),
@@ -453,7 +484,7 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
                   ? Center(
                       child: Text(
                         widget.strings.noFiles,
-                        style: const TextStyle(color: Color(0xFF6E6E73)),
+                        style: TextStyle(color: tokens.muted),
                       ),
                     )
                   : LayoutBuilder(
@@ -531,6 +562,7 @@ class _FileCardState extends State<_FileCard> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     final name = p.basename(widget.filePath);
     final type = _fileType(widget.filePath);
     final icon = switch (type) {
@@ -544,12 +576,10 @@ class _FileCardState extends State<_FileCard> {
       duration: const Duration(milliseconds: 140),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: _hovering ? const Color(0xFFF0F7FF) : const Color(0xFFFAFAFC),
-        borderRadius: BorderRadius.circular(14),
+        color: _hovering ? tokens.hover : tokens.surfaceMuted,
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         border: Border.all(
-          color: _hovering
-              ? Theme.of(context).colorScheme.primary
-              : const Color(0xFFE5E5EA),
+          color: _hovering ? tokens.primary : tokens.border,
         ),
       ),
       child: Column(
@@ -557,12 +587,23 @@ class _FileCardState extends State<_FileCard> {
           Expanded(
             child: Container(
               width: double.infinity,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFEDEDF2)),
+                color: tokens.surface,
+                borderRadius: BorderRadius.circular(math.max(0, tokens.cardRadius - 2)),
+                border: Border.all(color: tokens.border),
               ),
-              child: Icon(icon, size: 34, color: const Color(0xFF6E6E73)),
+              child: type == _FileTab.image
+                  ? Image.file(
+                      File(widget.filePath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        icon,
+                        size: 34,
+                        color: tokens.muted,
+                      ),
+                    )
+                  : Icon(icon, size: 34, color: tokens.muted),
             ),
           ),
           const SizedBox(height: 8),
@@ -754,13 +795,26 @@ class _FormatSelectionState extends State<_FormatSelection> {
     setState(() => _options[format] = options);
   }
 
-  void _convert(String format, List<String>? files) {
+  Future<void> _convert(String format, List<String>? files) async {
+    final currentSettings = widget.settingsController.settings;
+    AppSettings effectiveSettings = currentSettings;
+    if (currentSettings.askBeforeConvert) {
+      final selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      if (selectedDirectory == null || selectedDirectory.isEmpty) {
+        return;
+      }
+      effectiveSettings =
+          currentSettings.copyWith(defaultOutputDirectory: selectedDirectory);
+    }
+
     widget.provider.startConversion(
       format,
       _getOptions(format).copyWith(
-          overwrite: widget.settingsController.settings.overwriteSource),
+        overwrite: effectiveSettings.overwriteSource,
+        gpuAcceleration: effectiveSettings.gpuAcceleration,
+      ),
       files: files,
-      settings: widget.settingsController.settings,
+      settings: effectiveSettings,
       onResult: widget.settingsController.addHistory,
     );
     widget.onShowResults();
@@ -862,6 +916,7 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
       onWillAcceptWithDetails: (details) => details.data.isNotEmpty,
       onAcceptWithDetails: (details) => widget.onConvert(details.data),
       builder: (context, candidateData, rejectedData) {
+        final tokens = _themeTokens(context);
         final active = candidateData.isNotEmpty;
         return MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -873,15 +928,15 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
             height: 54,
             decoration: BoxDecoration(
               color: active
-                  ? const Color(0xFFEAF4FF)
+                  ? tokens.primary.withValues(alpha: 0.10)
                   : _hovering
-                      ? const Color(0xFFF0F7FF)
-                      : const Color(0xFFFAFAFC),
-              borderRadius: BorderRadius.circular(12),
+                      ? tokens.hover
+                      : tokens.surfaceMuted,
+              borderRadius: BorderRadius.circular(tokens.cardRadius),
               border: Border.all(
                 color: active || _hovering
-                    ? Theme.of(context).colorScheme.primary
-                    : const Color(0xFFE0E0E0),
+                    ? tokens.primary
+                    : tokens.border,
                 width: active ? 2 : 1,
               ),
             ),
@@ -972,7 +1027,9 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
         : const <String>[];
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_themeTokens(context).cardRadius + 4),
+      ),
       title: Text('${widget.strings.formatSettings} - ${widget.format}'),
       content: SizedBox(
         width: 420,
@@ -1107,13 +1164,14 @@ class _HistoryHintCardState extends State<_HistoryHintCard> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       child: InkWell(
         mouseCursor: SystemMouseCursors.click,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         hoverColor: Colors.transparent,
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -1121,12 +1179,10 @@ class _HistoryHintCardState extends State<_HistoryHintCard> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _hovering ? const Color(0xFFF0F7FF) : const Color(0xFFFAFAFC),
-            borderRadius: BorderRadius.circular(14),
+            color: _hovering ? tokens.hover : tokens.surfaceMuted,
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
             border: Border.all(
-              color: _hovering
-                  ? Theme.of(context).colorScheme.primary
-                  : const Color(0xFFE0E0E0),
+              color: _hovering ? tokens.primary : tokens.border,
             ),
           ),
           child: Row(
@@ -1155,14 +1211,15 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: result.success ? Colors.white : const Color(0xFFFFF6F6),
-        borderRadius: BorderRadius.circular(14),
+        color: result.success ? tokens.surface : const Color(0xFFFFF6F6),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
         border: Border.all(
             color: result.success
-                ? const Color(0xFFE0E0E0)
+                ? tokens.border
                 : const Color(0xFFFFB3B3)),
       ),
       child: Row(
@@ -1237,52 +1294,75 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       TextEditingController(text: _settings.namingTemplate);
   late final TextEditingController _fontController =
       TextEditingController(text: _settings.fontFamily);
+  late final TextEditingController _leftFontController =
+      TextEditingController(text: _settings.leftPaneFontFamily);
+  late final TextEditingController _rightFontController =
+      TextEditingController(text: _settings.rightPaneFontFamily);
+  late final TextEditingController _settingsFontController =
+      TextEditingController(text: _settings.settingsFontFamily);
+  late final TextEditingController _iconPathController =
+      TextEditingController(text: _settings.appIconPath);
 
   @override
   void dispose() {
     _directoryController.dispose();
     _templateController.dispose();
     _fontController.dispose();
+    _leftFontController.dispose();
+    _rightFontController.dispose();
+    _settingsFontController.dispose();
+    _iconPathController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980, maxHeight: 720),
-        child: Row(
-          children: [
-            Container(
-              width: 180,
-              padding: const EdgeInsets.all(14),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F7),
-                borderRadius:
-                    BorderRadius.horizontal(left: Radius.circular(22)),
+    final tokens = _themeTokens(context);
+    return DefaultTextStyle.merge(
+      style: TextStyle(
+        fontFamily: _settings.settingsFontFamily.isEmpty
+            ? null
+            : _settings.settingsFontFamily,
+      ),
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(tokens.cardRadius + 8),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 980, maxHeight: 720),
+          child: Row(
+            children: [
+              Container(
+                width: 180,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: tokens.background,
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(tokens.cardRadius + 8),
+                  ),
+                ),
+                child: Column(
+                  children: _SettingsTab.values.map((tab) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _SideMenuButton(
+                        label: _tabLabel(tab),
+                        selected: _tab == tab,
+                        onTap: () => setState(() => _tab = tab),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
-              child: Column(
-                children: _SettingsTab.values.map((tab) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _SideMenuButton(
-                      label: _tabLabel(tab),
-                      selected: _tab == tab,
-                      onTap: () => setState(() => _tab = tab),
-                    ),
-                  );
-                }).toList(),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(22),
+                  child: _buildContent(context),
+                ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(22),
-                child: _buildContent(context),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1399,10 +1479,64 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           },
         ),
         if (_settings.developerMode)
-          FilledButton.icon(
-            onPressed: () => _editThemeJson(context),
-            icon: const Icon(Icons.code_rounded, size: 18),
-            label: Text(widget.strings.edit),
+          _SettingsSectionCard(
+            title: widget.strings.appearance,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _editThemeJson(context),
+                icon: const Icon(Icons.palette_outlined, size: 18),
+                label: Text(widget.strings.themeColors),
+              ),
+              _TextSetting(
+                label: widget.strings.appIconPath,
+                controller: _iconPathController,
+                helper: widget.strings.appIconTip,
+                action: IconButton(
+                  icon: const Icon(Icons.image_outlined),
+                  onPressed: () async {
+                    final result = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['ico'],
+                    );
+                    final paths = result?.paths.whereType<String>().toList();
+                    final path = paths == null || paths.isEmpty ? null : paths.first;
+                    if (path != null) {
+                      _iconPathController.text = path;
+                      _save(_settings.copyWith(appIconPath: path));
+                    }
+                  },
+                ),
+                onSubmitted: (value) =>
+                    _save(_settings.copyWith(appIconPath: value)),
+              ),
+              _TextSetting(
+                label: widget.strings.leftPaneFont,
+                controller: _leftFontController,
+                onSubmitted: (value) =>
+                    _save(_settings.copyWith(leftPaneFontFamily: value)),
+              ),
+              _TextSetting(
+                label: widget.strings.rightPaneFont,
+                controller: _rightFontController,
+                onSubmitted: (value) =>
+                    _save(_settings.copyWith(rightPaneFontFamily: value)),
+              ),
+              _TextSetting(
+                label: widget.strings.settingsFont,
+                controller: _settingsFontController,
+                onSubmitted: (value) =>
+                    _save(_settings.copyWith(settingsFontFamily: value)),
+              ),
+              _SliderSetting(
+                label: widget.strings.cardRadius,
+                value: _settings.cardRadius.round().clamp(0, 36).toInt(),
+                min: 0,
+                max: 36,
+                suffix: 'px',
+                onChanged: (value) =>
+                    _save(_settings.copyWith(cardRadius: value.toDouble())),
+              ),
+            ],
           ),
       ],
     );
@@ -1548,7 +1682,7 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final tokens = _themeTokens(context);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -1563,10 +1697,10 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
           duration: const Duration(milliseconds: 140),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: _hovering ? const Color(0xFFF0F7FF) : const Color(0xFFFAFAFC),
-            borderRadius: BorderRadius.circular(14),
+            color: _hovering ? tokens.hover : tokens.surfaceMuted,
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
             border: Border.all(
-              color: _hovering ? primary : const Color(0xFFE0E0E0),
+              color: _hovering ? tokens.primary : tokens.border,
             ),
           ),
           child: Row(
@@ -1579,7 +1713,9 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
               ),
               CustomPaint(
                 size: const Size(22, 22),
-                painter: _GitHubLogoPainter(color: _hovering ? primary : const Color(0xFF1D1D1F)),
+                painter: _GitHubLogoPainter(
+                  color: _hovering ? tokens.primary : tokens.ink,
+                ),
               ),
             ],
           ),
@@ -1709,12 +1845,13 @@ class _StickyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        color: tokens.surface,
+        borderRadius: BorderRadius.circular(tokens.cardRadius + 4),
+        border: Border.all(color: tokens.border),
       ),
       child: child,
     );
@@ -1781,6 +1918,7 @@ class _SideMenuButtonState extends State<_SideMenuButton> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),
@@ -1796,11 +1934,11 @@ class _SideMenuButtonState extends State<_SideMenuButton> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
             color: widget.selected
-                ? Colors.white
+                ? tokens.surface
                 : _hovering
-                    ? const Color(0xFFEAF4FF)
+                    ? tokens.hover
                     : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
           ),
           child: Text(widget.label,
             style: TextStyle(
@@ -1830,6 +1968,38 @@ class _SettingsSection extends StatelessWidget {
         const SizedBox(height: 20),
         ...children.expand((child) => [child, const SizedBox(height: 14)]),
       ],
+    );
+  }
+}
+
+class _SettingsSectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SettingsSectionCard({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: tokens.surfaceMuted,
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
+        border: Border.all(color: tokens.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          ...children.expand((child) => [child, const SizedBox(height: 12)]),
+        ],
+      ),
     );
   }
 }
@@ -1921,29 +2091,39 @@ class _SegmentSetting<T> extends StatelessWidget {
 class _SliderSetting extends StatelessWidget {
   final String label;
   final int value;
+  final int min;
+  final int max;
+  final String suffix;
   final ValueChanged<int> onChanged;
 
   const _SliderSetting({
     required this.label,
     required this.value,
     required this.onChanged,
+    this.min = 1,
+    this.max = 100,
+    this.suffix = '%',
   });
 
   @override
   Widget build(BuildContext context) {
+    final clampedValue = value.clamp(min, max).toInt();
     return Row(
       children: [
         SizedBox(width: 96, child: Text(label)),
         Expanded(
           child: Slider(
-            value: value.toDouble(),
-            min: 1,
-            max: 100,
-            divisions: 99,
+            value: clampedValue.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
             onChanged: (value) => onChanged(value.round()),
           ),
         ),
-        SizedBox(width: 54, child: Text('$value%', textAlign: TextAlign.end)),
+        SizedBox(
+          width: 54,
+          child: Text('$clampedValue$suffix', textAlign: TextAlign.end),
+        ),
       ],
     );
   }
@@ -2016,7 +2196,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF4F4),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_themeTokens(context).cardRadius),
         border: Border.all(color: const Color(0xFFFFB3B3)),
       ),
       child: Row(
@@ -2081,4 +2261,19 @@ String _formatDuration(Duration duration) {
 String _formatTime(DateTime time) {
   String two(int value) => value.toString().padLeft(2, '0');
   return '${time.year}-${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
+}
+
+AppThemeTokens _themeTokens(BuildContext context) {
+  return Theme.of(context).extension<AppThemeTokens>() ??
+      const AppThemeTokens(
+        background: Color(0xFFF5F5F7),
+        surface: Colors.white,
+        surfaceMuted: Color(0xFFFAFAFC),
+        hover: Color(0xFFF0F7FF),
+        ink: Color(0xFF1D1D1F),
+        muted: Color(0xFF6E6E73),
+        primary: Color(0xFF0066CC),
+        border: Color(0xFFE0E0E0),
+        cardRadius: 14,
+      );
 }

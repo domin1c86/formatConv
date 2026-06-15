@@ -87,3 +87,37 @@ go test ./...
 ## 许可证
 
 MIT License
+
+## 内测版外部工具打包
+
+内测版推荐随软件打包 FFmpeg 和 ImageMagick，用户不需要手动安装。
+
+开发者本地构建前，请准备以下目录：
+
+```text
+third_party/tools/windows/
+  ffmpeg/
+    ffmpeg.exe
+    ffprobe.exe
+  imagemagick/
+    magick.exe
+    其他 ImageMagick portable 文件
+```
+
+构建脚本会把工具复制到发布目录：
+
+```text
+apps/build/windows/x64/runner/Release/
+  format_conv.exe
+  format_conv.dll
+  data/
+  tools/
+    ffmpeg.exe
+    ffprobe.exe
+    magick.exe
+    ImageMagick portable 其他文件
+```
+
+FFmpeg 通常只需要 `ffmpeg.exe` 和 `ffprobe.exe`。ImageMagick 不建议只复制 `magick.exe`，应保留 portable 包内的相关文件，避免部分图片格式在其他机器上转换失败。
+
+注意许可证：正式发布前需要确认所使用的 FFmpeg 构建版本是 GPL 还是 LGPL，并随安装包附带相应许可证。ImageMagick 也应附带对应 license 文件。

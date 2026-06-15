@@ -71,6 +71,16 @@ class AppStrings {
   String get lightTheme => isZh ? '浅色' : 'Light';
   String get darkTheme => isZh ? '深色' : 'Dark';
   String get font => isZh ? '字体' : 'Font';
+  String get leftPaneFont => isZh ? '左侧区域字体' : 'Left pane font';
+  String get rightPaneFont => isZh ? '右侧区域字体' : 'Right pane font';
+  String get settingsFont => isZh ? '设置弹窗字体' : 'Settings dialog font';
+  String get cardRadius => isZh ? '卡片圆角' : 'Card radius';
+  String get appIconPath => isZh ? '开发/打包图标路径' : 'Development/package icon path';
+  String get appIconTip => isZh
+      ? '选择 .ico 文件后保存路径；已构建 exe 的图标仍需要替换项目 app_icon.ico 并重新构建。'
+      : 'Choose an .ico file path. Built exe icons still require replacing app_icon.ico and rebuilding.';
+  String get themeColors => isZh ? '主题颜色' : 'Theme colors';
+  String get appearance => isZh ? '外观设置' : 'Appearance';
   String get visibleFormats => isZh ? '格式选择' : 'Visible formats';
   String get developerMode => isZh ? '开发者模式' : 'Developer mode';
   String get developerWarning => isZh

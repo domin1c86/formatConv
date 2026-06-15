@@ -86,7 +86,9 @@ class SettingsController extends ChangeNotifier {
         return 'Theme JSON must be an object.';
       }
       await update(_settings.copyWith(
-          themeJson: const JsonEncoder.withIndent('  ').convert(decoded)));
+        themeJson: const JsonEncoder.withIndent('  ').convert(decoded),
+        cardRadius: (decoded['cardRadius'] as num?)?.toDouble(),
+      ));
       return null;
     } catch (e) {
       return 'Invalid JSON: $e';

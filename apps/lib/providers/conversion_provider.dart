@@ -348,24 +348,32 @@ class ConversionProvider extends ChangeNotifier {
     final dir = configuredDir.isEmpty ? p.dirname(inputPath) : configuredDir;
     final baseName = p.basenameWithoutExtension(inputPath);
     final ext = format.toLowerCase();
-    final template = settings?.namingTemplate ?? r'$name$_1';
-    final outputBaseName = template.contains(r'$name$')
-        ? template.replaceAll(r'$name$', baseName).replaceAll(r'$num$', '1')
-        : baseName;
-    var outputPath = p.join(dir, '$outputBaseName.$ext');
+    final template = _normalizedNamingTemplate(settings?.namingTemplate);
+    var outputPath = p.join(dir, '${_applyNamingTemplate(template, baseName, 1)}.$ext');
 
     if (overwrite) return outputPath;
 
-    int suffix = 1;
+    int suffix = 2;
     while (File(outputPath).existsSync()) {
-      final generatedName = template.contains(r'$name$')
-          ? template
-              .replaceAll(r'$name$', baseName)
-              .replaceAll(r'$num$', '$suffix')
-          : '${baseName}_$suffix';
-      outputPath = p.join(dir, '$generatedName.$ext');
+      outputPath = p.join(
+        dir,
+        '${_applyNamingTemplate(template, baseName, suffix)}.$ext',
+      );
       suffix++;
     }
     return outputPath;
+  }
+
+  String _normalizedNamingTemplate(String? template) {
+    final trimmed = template?.trim() ?? '';
+    if (trimmed.isEmpty) return r'$name$_1';
+    return trimmed.contains(r'$name$') ? trimmed : r'$name$_$num$';
+  }
+
+  String _applyNamingTemplate(String template, String baseName, int number) {
+    final result = template
+        .replaceAll(r'$name$', baseName)
+        .replaceAll(r'$num$', '$number');
+    return result.trim().isEmpty ? '${baseName}_$number' : result;
   }
 }

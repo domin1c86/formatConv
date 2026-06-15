@@ -35,3 +35,6 @@ native/vendor/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local third-party tool cache for Windows packaging
+third_party/tools/windows/
