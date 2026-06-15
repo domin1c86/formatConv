@@ -61,7 +61,14 @@ class ConversionService {
     if (onProgress != null) {
       nativeCallable = NativeCallable<_ProgressCallbackNative>.listener(
         (int id, double progress, int processed, int total, int status, Pointer<Utf8> error) {
-          final errorStr = error == nullptr ? null : error.toDartString();
+          String? errorStr;
+          if (error != nullptr) {
+            try {
+              errorStr = error.toDartString();
+            } catch (_) {
+              errorStr = 'Unknown error';
+            }
+          }
           onProgress(id, progress, processed, total, status, errorStr);
         },
       );
