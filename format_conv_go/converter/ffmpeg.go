@@ -1,7 +1,6 @@
 package converter
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"format_conv_go/models"
 )
@@ -28,7 +28,7 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 	if err != nil {
 		return fmt.Errorf("cannot stat input file: %w", err)
 	}
-	totalBytes := inputInfo.Size()
+	inputSize := inputInfo.Size()
 
 	if !options.Overwrite {
 		if _, err := os.Stat(outputPath); err == nil {
@@ -46,73 +46,77 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 	}
 
 	args := e.buildArgs(inputPath, outputPath, options)
-
 	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 
+	// Drain stderr in background to prevent pipe blocking
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return fmt.Errorf("cannot create stderr pipe: %w", err)
 	}
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := stderr.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("cannot start ffmpeg: %w", err)
 	}
 
-	duration := e.getDuration(ctx, inputPath)
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
 
-	scanner := bufio.NewScanner(stderr)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if duration > 0 {
-			if currentTime := e.parseTime(line); currentTime > 0 {
-				progress := currentTime / duration
-				if progress > 1.0 {
-					progress = 1.0
-				}
-				if progressCallback != nil {
-					progressCallback(progress)
-				}
-				if byteCallback != nil {
-					processed := int64(float64(totalBytes) * progress)
-					byteCallback(processed, totalBytes)
-				}
-			}
-		} else if strings.Contains(line, "size=") {
-			if outputSize := e.parseOutputSize(line); outputSize > 0 {
-				if byteCallback != nil {
-					byteCallback(outputSize, totalBytes)
-				}
-				if progressCallback != nil && totalBytes > 0 {
-					progress := float64(outputSize) / float64(totalBytes)
-					if progress > 1.0 {
-						progress = 1.0
-					}
-					progressCallback(progress)
-				}
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading ffmpeg output: %w", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("ffmpeg conversion failed: %w", err)
-	}
+	// Periodically check output file size for real progress
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
 
 	if progressCallback != nil {
-		progressCallback(1.0)
+		progressCallback(0.0)
 	}
 	if byteCallback != nil {
-		if outInfo, err := os.Stat(outputPath); err == nil {
-			byteCallback(outInfo.Size(), totalBytes)
-		} else {
-			byteCallback(totalBytes, totalBytes)
-		}
+		byteCallback(0, inputSize)
 	}
 
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-done:
+			if err != nil {
+				return fmt.Errorf("ffmpeg conversion failed: %w", err)
+			}
+			if progressCallback != nil {
+				progressCallback(1.0)
+			}
+			if byteCallback != nil {
+				byteCallback(inputSize, inputSize)
+			}
+			return nil
+		case <-ticker.C:
+			var progress float64
+			var processed int64
+			if outInfo, err := os.Stat(outputPath); err == nil {
+				processed = outInfo.Size()
+				if inputSize > 0 {
+					progress = float64(processed) / float64(inputSize)
+					if progress > 0.95 {
+						progress = 0.95 // Cap at 95% until process completes
+					}
+				}
+			}
+			if progressCallback != nil {
+				progressCallback(progress)
+			}
+			if byteCallback != nil {
+				byteCallback(processed, inputSize)
+			}
+		}
+	}
 }
 
 func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {
