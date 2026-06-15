@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"format_conv_go/converter"
+	"native/converter"
 )
 
 func TestDetectFormat_VideoFile(t *testing.T) {

@@ -12,7 +12,7 @@ IMAGEMAGICK_VERSION="7.1.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FLUTTER_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-GO_DIR="$FLUTTER_DIR/../format_conv_go"
+GO_DIR="$FLUTTER_DIR/../native"
 
 cleanup_paths=()
 cleanup() {
@@ -94,78 +94,6 @@ download_imagemagick_windows() {
     download_and_verify "$url" "$tmpzip" "${IMAGEMAGICK_WIN_SHA256:-}" "ImageMagick Windows"
     unzip -q -o "$tmpzip" -d "$dest"
     rm -f "$tmpzip"
-}
-
-download_ffmpeg_linux() {
-    local dest="$1"
-    echo "Downloading FFmpeg static build for Linux..."
-    mkdir -p "$dest"
-    local url="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-    check_url "$url" "FFmpeg Linux"
-    local tmptar="/tmp/ffmpeg-linux.tar.xz"
-    local tmpdir="/tmp/ffmpeg-linux"
-    cleanup_paths+=("$tmptar" "$tmpdir")
-    download_and_verify "$url" "$tmptar" "${FFMPEG_LINUX_SHA256:-}" "FFmpeg Linux"
-    mkdir -p "$tmpdir"
-    tar -xf "$tmptar" -C "$tmpdir" --strip-components=1
-    cp "$tmpdir/ffmpeg" "$dest/"
-    cp "$tmpdir/ffprobe" "$dest/"
-    rm -rf "$tmptar" "$tmpdir"
-}
-
-download_imagemagick_linux() {
-    local dest="$1"
-    echo "Downloading ImageMagick static build for Linux..."
-    mkdir -p "$dest"
-    local url="https://imagemagick.org/download/binaries/magick"
-    check_url "$url" "ImageMagick Linux"
-    local tmpfile="/tmp/magick-linux"
-    cleanup_paths+=("$tmpfile")
-    download_and_verify "$url" "$tmpfile" "${IMAGEMAGICK_LINUX_SHA256:-}" "ImageMagick Linux"
-    cp "$tmpfile" "$dest/magick"
-    chmod +x "$dest/magick"
-    rm -f "$tmpfile"
-}
-
-download_ffmpeg_macos() {
-    local dest="$1"
-    echo "Downloading FFmpeg for macOS..."
-    mkdir -p "$dest"
-    local url="https://evermeet.cx/ffmpeg/ffmpeg-${FFMPEG_VERSION}.zip"
-    check_url "$url" "FFmpeg macOS"
-    local tmpzip="/tmp/ffmpeg-macos.zip"
-    cleanup_paths+=("$tmpzip")
-    download_and_verify "$url" "$tmpzip" "${FFMPEG_MACOS_SHA256:-}" "FFmpeg macOS"
-    unzip -q -o "$tmpzip" -d "$dest"
-    rm -f "$tmpzip"
-}
-
-download_ffprobe_macos() {
-    local dest="$1"
-    echo "Downloading ffprobe for macOS..."
-    local url="https://evermeet.cx/ffmpeg/ffprobe-${FFMPEG_VERSION}.zip"
-    check_url "$url" "ffprobe macOS"
-    local tmpzip="/tmp/ffprobe-macos.zip"
-    cleanup_paths+=("$tmpzip")
-    download_and_verify "$url" "$tmpzip" "${FFPROBE_MACOS_SHA256:-}" "ffprobe macOS"
-    unzip -q -o "$tmpzip" -d "$dest"
-    rm -f "$tmpzip"
-}
-
-download_imagemagick_macos() {
-    local dest="$1"
-    echo "Downloading ImageMagick for macOS..."
-    mkdir -p "$dest"
-    local url="https://imagemagick.org/archive/binaries/ImageMagick-${IMAGEMAGICK_VERSION}-clang.tar.gz"
-    check_url "$url" "ImageMagick macOS"
-    local tmptar="/tmp/imagemagick-macos.tar.gz"
-    local tmpdir="/tmp/imagemagick-macos"
-    cleanup_paths+=("$tmptar" "$tmpdir")
-    download_and_verify "$url" "$tmptar" "${IMAGEMAGICK_MACOS_SHA256:-}" "ImageMagick macOS"
-    mkdir -p "$tmpdir"
-    tar -xzf "$tmptar" -C "$tmpdir" --strip-components=1
-    cp "$tmpdir/bin/magick" "$dest/" 2>/dev/null || cp "$tmpdir/magick" "$dest/" 2>/dev/null || echo "WARNING: Could not find magick binary in archive"
-    rm -rf "$tmptar" "$tmpdir"
 }
 
 download_and_verify() {

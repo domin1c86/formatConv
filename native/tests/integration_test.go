@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"format_conv_go/converter"
-	"format_conv_go/models"
+	"native/converter"
+	"native/models"
 )
 
 func TestIntegration_ConvertVideoFile(t *testing.T) {

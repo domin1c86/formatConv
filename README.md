@@ -1,10 +1,10 @@
 # FormatConv
 
-A cross-platform format conversion tool supporting video, image, and audio conversion with lossless/lossy options.
+A Windows format conversion tool supporting video, image, and audio conversion with lossless/lossy options.
 
 ## Features
 
-- **Cross-platform**: Supports Windows, macOS, and Linux
+- **Windows desktop**: Flutter Windows app with a Go native conversion engine
 - **Multiple formats**: Video (MP4, MKV, MOV, AVI, WebM), Image (JPEG, PNG, WebP, TIFF, BMP), Audio (MP3, FLAC, WAV, AAC, OGG)
 - **Lossless conversion**: Default lossless conversion with optional lossy compression
 - **Batch conversion**: Convert multiple files at once
@@ -31,22 +31,21 @@ A cross-platform format conversion tool supporting video, image, and audio conve
 
 1. Build Go shared library:
    ```bash
-   cd format_conv_go
+   cd native
    ./scripts/build_all.sh
    ```
 
 2. Build Flutter application:
-   ```bash
-   cd format_conv
-   ./scripts/build_app.sh
+   ```powershell
+   cd apps
+   ./scripts/build_windows.ps1
    ```
 
 ### Running
 
-1. Copy the built shared library to the Flutter application directory
-2. Run the Flutter application:
+Run the Flutter application:
    ```bash
-   cd format_conv
+   cd apps
    flutter run
    ```
 

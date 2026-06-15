@@ -12,18 +12,18 @@
 1. Clone the repository
 2. Install Flutter dependencies:
    ```bash
-   cd format_conv
+   cd apps
    flutter pub get
    ```
 3. Install Go dependencies:
    ```bash
-   cd format_conv_go
+   cd native
    go mod tidy
    ```
 
 ## Project Structure
 
-### Flutter Frontend (`format_conv/`)
+### Flutter Frontend (`apps/`)
 - `lib/`: Main application code
   - `models/`: Data models
   - `services/`: Business logic and FFI calls
@@ -36,7 +36,7 @@
   - `widget/`: Widget tests
   - `integration/`: Integration tests
 
-### Go Backend (`format_conv_go/`)
+### Go Backend (`native/`)
 - `converter/`: Conversion logic
   - `format_detector.go`: File format detection
   - `converter.go`: Main conversion orchestrator
@@ -56,24 +56,24 @@
 ### Testing
 1. Run Flutter tests:
    ```bash
-   cd format_conv
+   cd apps
    flutter test
    ```
 2. Run Go tests:
    ```bash
-   cd format_conv_go
+   cd native
    go test ./...
    ```
 
 ### Building
 1. Build Go shared library:
    ```bash
-   cd format_conv_go
+   cd native
    ./scripts/build_all.sh
    ```
 2. Build Flutter application:
    ```bash
-   cd format_conv
+   cd apps
    ./scripts/build_app.sh
    ```
 

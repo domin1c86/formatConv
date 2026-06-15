@@ -41,12 +41,8 @@ class FFIHelper {
     
     if (Platform.isWindows) {
       _lib = DynamicLibrary.open('format_conv.dll');
-    } else if (Platform.isMacOS) {
-      _lib = DynamicLibrary.open('libformat_conv.dylib');
-    } else if (Platform.isLinux) {
-      _lib = DynamicLibrary.open('libformat_conv.so');
     } else {
-      throw UnsupportedError('Platform not supported');
+      throw UnsupportedError('Only Windows is supported');
     }
     
     return _lib!;

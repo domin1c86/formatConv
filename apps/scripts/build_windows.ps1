@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $FlutterDir = Resolve-Path (Join-Path $ScriptDir "..")
 $RepoRoot = Resolve-Path (Join-Path $FlutterDir "..")
-$GoDir = Join-Path $RepoRoot "format_conv_go"
+$GoDir = Join-Path $RepoRoot "native"
 $DllPath = Join-Path $FlutterDir "format_conv.dll"
 
 Write-Host "Building Go shared library..."

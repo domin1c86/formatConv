@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"format_conv_go/models"
+	"native/models"
 )
 
 type ImageMagickEngine struct{}

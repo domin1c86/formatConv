@@ -7,29 +7,27 @@ AGENTS.md
 DESIGN.md
 
 # Flutter
-format_conv/.dart_tool/
-format_conv/.packages
-format_conv/build/
-format_conv/.flutter-plugins
-format_conv/.flutter-plugins-dependencies
-format_conv/pubspec.lock
-format_conv/.metadata
-format_conv/android/
-format_conv/ios/
-format_conv/linux/flutter/
-format_conv/macos/Flutter/
-format_conv/windows/flutter/
-format_conv/web/
+apps/.dart_tool/
+apps/.packages
+apps/build/
+apps/.flutter-plugins
+apps/.flutter-plugins-dependencies
+apps/pubspec.lock
+apps/.metadata
+apps/android/
+apps/ios/
+apps/windows/flutter/
+apps/web/
 *.iml
 .idea/
 .vscode/
 
 # Go
-format_conv_go/*.dll
-format_conv_go/*.dylib
-format_conv_go/*.so
-format_conv_go/*.h
-format_conv_go/vendor/
+native/*.dll
+native/*.dylib
+native/*.so
+native/*.h
+native/vendor/
 
 # General
 *.exe

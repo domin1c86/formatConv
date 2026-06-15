@@ -12,8 +12,8 @@ import (
 	"runtime"
 	"unsafe"
 
-	"format_conv_go/converter"
-	"format_conv_go/models"
+	"native/converter"
+	"native/models"
 )
 
 var conv *converter.Converter
