@@ -25,8 +25,8 @@ class FileSelector extends StatelessWidget {
           Expanded(
             child: DragTarget<List<String>>(
               onWillAcceptWithDetails: (data) => true,
-              onAcceptWithDetails: (data) {
-                onFilesSelected(data);
+              onAcceptWithDetails: (details) {
+                onFilesSelected(details.data);
               },
               builder: (context, candidateData, rejectedData) {
                 return Container(

@@ -64,10 +64,14 @@ class _FormatSelectorState extends State<FormatSelector> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisSize: MainAxisSize.max,
             children: [
-              const Text(
-                'Select Output Format',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              const Flexible(
+                child: Text(
+                  'Select Output Format',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const Spacer(),
               Row(
