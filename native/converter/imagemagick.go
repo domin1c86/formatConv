@@ -132,6 +132,9 @@ func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options mode
 			quality = 85
 		}
 		args = append(args, "-quality", fmt.Sprintf("%d", quality))
+		if options.CompressionAlgorithm != "" {
+			args = append(args, "-compress", options.CompressionAlgorithm)
+		}
 	}
 
 	args = append(args, outputPath)

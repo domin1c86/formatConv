@@ -5,6 +5,7 @@ CLAUDE.md
 AGENT.md
 AGENTS.md
 DESIGN.md
+test.txt
 
 # Flutter
 apps/.dart_tool/
@@ -16,7 +17,7 @@ apps/pubspec.lock
 apps/.metadata
 apps/android/
 apps/ios/
-apps/windows/flutter/
+apps/windows/flutter/ephemeral/
 apps/web/
 *.iml
 .idea/

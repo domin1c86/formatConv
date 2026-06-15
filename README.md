@@ -41,6 +41,8 @@ A Windows format conversion tool supporting video, image, and audio conversion w
    ./scripts/build_windows.ps1
    ```
 
+The Flutter Windows application and native Go DLL are built for x64.
+
 ### Running
 
 Run the Flutter application:

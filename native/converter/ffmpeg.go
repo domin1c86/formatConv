@@ -137,10 +137,21 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 		}
 	} else {
 		if options.Codec != "" {
-			args = append(args, "-c:v", mapCodecName(options.Codec))
+			if isAudioOutput(outputPath) {
+				args = append(args, "-c:a", mapCodecName(options.Codec))
+			} else {
+				args = append(args, "-c:v", mapCodecName(options.Codec))
+			}
 		}
 		if options.Quality > 0 {
 			args = append(args, "-crf", strconv.Itoa(51-options.Quality/2))
+		}
+		if options.Bitrate != "" {
+			if isAudioOutput(outputPath) {
+				args = append(args, "-b:a", options.Bitrate)
+			} else {
+				args = append(args, "-b:v", options.Bitrate)
+			}
 		}
 	}
 
@@ -150,6 +161,15 @@ func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.Co
 
 	args = append(args, outputPath)
 	return args
+}
+
+func isAudioOutput(outputPath string) bool {
+	switch strings.ToLower(filepath.Ext(outputPath)) {
+	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".opus":
+		return true
+	default:
+		return false
+	}
 }
 
 func mapCodecName(uiName string) string {
@@ -168,6 +188,12 @@ func mapCodecName(uiName string) string {
 		"WMV9":       "wmv3",
 		"MPEG-2":     "mpeg2video",
 		"H.263":      "h263",
+		"libmp3lame": "libmp3lame",
+		"aac":        "aac",
+		"libvorbis":  "libvorbis",
+		"libopus":    "libopus",
+		"flac":       "flac",
+		"pcm_s16le":  "pcm_s16le",
 	}
 	if mapped, ok := codecMap[uiName]; ok {
 		return mapped
