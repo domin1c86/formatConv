@@ -77,7 +77,12 @@ Windows internal builds may bundle external tools under `Release/tools/`:
   - Source: <https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-25>
   - License: ImageMagick License
 - MiSans fonts are bundled as third-party font assets and are not covered by
-  the FormatConv MIT License.
+  the FormatConv MIT License. FormatConv specifically indicates that it uses
+  MiSans fonts, and the fonts must not be redistributed as standalone font
+  software.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for release packaging
 requirements. Installer builds copy notices into `Release/licenses/`.
+For public releases, save the official MiSans license PDF as
+`licenses/MiSans-License-Agreement.pdf` so the build script can include it in the
+installer.

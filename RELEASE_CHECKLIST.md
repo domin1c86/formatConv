@@ -10,6 +10,8 @@ Use this checklist before publishing a Windows installer.
 - `third_party/tools/windows/ffmpeg/ffmpeg-git-essentials.7z.sha256` is saved for public releases.
 - `third_party/tools/windows/imagemagick/magick.exe` exists.
 - The full ImageMagick portable package contents are present, including `LICENSE.txt` and `NOTICE.txt` when available.
+- MiSans is listed as a third-party font in `THIRD_PARTY_NOTICES.md`.
+- For public releases, save the official MiSans license PDF as `licenses/MiSans-License-Agreement.pdf`.
 
 ## Build Command
 
@@ -37,6 +39,7 @@ apps/build/windows/x64/runner/Release/
     FFmpeg-GPLv3.txt
     FFmpeg-SOURCE.txt
     ImageMagick-LICENSE.txt
+    MiSans-NOTICE.txt
     THIRD_PARTY_NOTICES.txt
 ```
 
@@ -61,3 +64,5 @@ FFmpeg source commit or source archive link that matches the downloaded
 - About page can open third-party notices from the installed app.
 - The installer includes the complete `tools/` and `licenses/` directories.
 - The app still works on a machine without system FFmpeg/ImageMagick in `PATH`.
+- The About page states that FormatConv uses FFmpeg, ImageMagick, and third-party licenses.
+- The release notes do not present MiSans as part of FormatConv's MIT-licensed source code.

@@ -45,11 +45,20 @@ delegates, license, and notice files.
 ## MiSans
 
 - Component: bundled MiSans font files under `apps/assets/fonts/`
-- License: provided by the upstream font owner/distributor
+- Licensor: Xiaomi Inc.
+- License: MiSans Font Intellectual Property License Agreement
+- License URL: <https://hyperos.mi.com/font-download/MiSans%E5%AD%97%E4%BD%93%E7%9F%A5%E8%AF%86%E4%BA%A7%E6%9D%83%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf>
 
 MiSans is bundled as a third-party font asset. It is not licensed under
-FormatConv's MIT License. Before a public release, keep the upstream MiSans
-license or permission notice in the installer and release notes.
+FormatConv's MIT License.
+
+FormatConv specifically indicates that it uses MiSans fonts. Do not adapt or
+redevelop the MiSans font files or their components. Do not rent, sublicense,
+give, loan, redistribute, or sell MiSans as standalone font software. Any copy of
+the MiSans fonts should retain the copyright notice and the MiSans Font
+Intellectual Property License Agreement. The bundled fonts are used only as UI
+assets of FormatConv and should not be extracted and redistributed
+independently.
 
 ## Release Notice Text
 

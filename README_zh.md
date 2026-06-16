@@ -104,9 +104,10 @@ FormatConv 项目源码使用 MIT License。Windows 安装包中随附的 FFmpeg
 
 - FFmpeg：当前使用 gyan.dev `ffmpeg-git-essentials.7z`，按 GPLv3 处理。
 - ImageMagick：当前使用 `ImageMagick-7.1.2-25-portable-Q16-x64.7z`，按 ImageMagick License 处理。
-- MiSans：按字体上游授权处理，不默认归入 MIT。
+- MiSans：按小米 MiSans 字体知识产权许可协议处理，不默认归入 MIT。FormatConv 需要明确注明使用了 MiSans 字体，且不得将 MiSans 字体作为独立字体软件再分发、转授权或售卖。
 
 发布安装包前请检查 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，并确保安装目录中包含 `licenses/`。
+正式发布前，建议把 MiSans 官方许可 PDF 保存为 `licenses/MiSans-License-Agreement.pdf`，构建脚本会自动复制到安装包的 `licenses/` 目录。
 
 ## 许可证
 
