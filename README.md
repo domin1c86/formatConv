@@ -1,6 +1,13 @@
-# FormatConv
+<p align="right">
+  English | <a href="./README_zh.md">中文</a>
+</p>
 
-A Windows format conversion tool supporting video, image, and audio conversion with lossless/lossy options.
+<p align="center">
+  <h1 align="center">Layover Lens 中转助手</h1>
+  <p align="center"><em>A Windows format conversion tool supporting video, image, and audio conversion with lossless/lossy options.</em></p>
+</p>
+
+---
 
 ## Features
 

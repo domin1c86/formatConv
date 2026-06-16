@@ -1,6 +1,13 @@
-# FormatConv
+<p align="right">
+  <a href="./README_zh.md">English</a> | 中文
+</p>
 
-FormatConv 是一个面向 Windows 的本地格式转换工具，支持视频、音频和图片批量转换，并提供压缩率、编码格式、输出目录、历史记录和中英双语界面等功能。
+<p align="center">
+  <h1 align="center">Format Converter</h1>
+  <p align="center"><em>FormatConv 是一个面向 Windows 的本地格式转换工具，支持视频、音频和图片批量转换，并提供压缩率、编码格式、输出目录、历史记录和中英双语界面等功能。</em></p>
+</p>
+
+---
 
 ## 功能
 
