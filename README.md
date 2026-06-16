@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <h1 align="center">Layover Lens 中转助手</h1>
+  <h1 align="center">Format Converter</h1>
   <p align="center"><em>A Windows format conversion tool supporting video, image, and audio conversion with lossless/lossy options.</em></p>
 </p>
 
