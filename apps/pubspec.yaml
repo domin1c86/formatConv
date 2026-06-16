@@ -42,7 +42,7 @@ flutter:
 
 msix_config:
   display_name: Format Converter
-  publisher_display_name: FormatConv
+  publisher_display_name: Domin1c
   identity_name: com.formatconv.app
   msix_version: 1.0.0.0
   logo_path: windows/runner/resources/app_icon.ico

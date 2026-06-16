@@ -13,6 +13,8 @@ $DllPath = Join-Path $FlutterDir "format_conv.dll"
 $ToolCacheDir = Join-Path $RepoRoot "third_party\tools\windows"
 $FfmpegCacheDir = Join-Path $ToolCacheDir "ffmpeg"
 $ImageMagickCacheDir = Join-Path $ToolCacheDir "imagemagick"
+$LicenseSourceDir = Join-Path $RepoRoot "licenses"
+$ThirdPartyNoticesPath = Join-Path $RepoRoot "THIRD_PARTY_NOTICES.md"
 
 function Assert-FileExists {
   param(
@@ -100,6 +102,86 @@ function Copy-ExternalTools {
   Write-Host "External tools bundled into: $toolsDir"
 }
 
+function Copy-IfExists {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Source,
+    [Parameter(Mandatory = $true)]
+    [string]$Destination
+  )
+
+  if (Test-Path -LiteralPath $Source -PathType Leaf) {
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    return $true
+  }
+
+  return $false
+}
+
+function Copy-LicenseFiles {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ReleaseDir
+  )
+
+  $releaseLicenseDir = Join-Path $ReleaseDir "licenses"
+  if (Test-Path -LiteralPath $releaseLicenseDir) {
+    Remove-Item -LiteralPath $releaseLicenseDir -Recurse -Force
+  }
+  New-Item -ItemType Directory -Force -Path $releaseLicenseDir | Out-Null
+
+  Assert-FileExists `
+    -Path (Join-Path $LicenseSourceDir "FormatConv-MIT.txt") `
+    -Message "Missing FormatConv MIT license template."
+  Assert-FileExists `
+    -Path (Join-Path $LicenseSourceDir "FFmpeg-GPLv3.txt") `
+    -Message "Missing FFmpeg GPLv3 notice."
+  Assert-FileExists `
+    -Path (Join-Path $LicenseSourceDir "FFmpeg-SOURCE.txt") `
+    -Message "Missing FFmpeg source tracking notice."
+  Assert-FileExists `
+    -Path $ThirdPartyNoticesPath `
+    -Message "Missing THIRD_PARTY_NOTICES.md."
+
+  Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "FormatConv-MIT.txt") -Destination (Join-Path $releaseLicenseDir "FormatConv-MIT.txt") -Force
+  Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "FFmpeg-GPLv3.txt") -Destination (Join-Path $releaseLicenseDir "FFmpeg-GPLv3.txt") -Force
+  Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "FFmpeg-SOURCE.txt") -Destination (Join-Path $releaseLicenseDir "FFmpeg-SOURCE.txt") -Force
+  Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "MiSans-NOTICE.txt") -Destination (Join-Path $releaseLicenseDir "MiSans-NOTICE.txt") -Force
+  Copy-Item -LiteralPath $ThirdPartyNoticesPath -Destination (Join-Path $releaseLicenseDir "THIRD_PARTY_NOTICES.txt") -Force
+
+  $imageMagickLicenseCopied = Copy-IfExists `
+    -Source (Join-Path $ImageMagickCacheDir "LICENSE.txt") `
+    -Destination (Join-Path $releaseLicenseDir "ImageMagick-LICENSE.txt")
+  if (-not $imageMagickLicenseCopied) {
+    Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "ImageMagick-LICENSE.txt") -Destination (Join-Path $releaseLicenseDir "ImageMagick-LICENSE.txt") -Force
+  }
+
+  Copy-IfExists `
+    -Source (Join-Path $ImageMagickCacheDir "NOTICE.txt") `
+    -Destination (Join-Path $releaseLicenseDir "ImageMagick-NOTICE.txt") | Out-Null
+
+  $ffmpegVersionCopied = Copy-IfExists `
+    -Source (Join-Path $FfmpegCacheDir "ffmpeg-git-essentials.7z.ver") `
+    -Destination (Join-Path $releaseLicenseDir "ffmpeg-git-essentials.7z.ver")
+  $ffmpegHashCopied = Copy-IfExists `
+    -Source (Join-Path $FfmpegCacheDir "ffmpeg-git-essentials.7z.sha256") `
+    -Destination (Join-Path $releaseLicenseDir "ffmpeg-git-essentials.7z.sha256")
+
+  if (-not $ffmpegVersionCopied) {
+    Write-Warning "Missing ffmpeg-git-essentials.7z.ver. Keep it for public releases to identify the exact FFmpeg git build."
+  }
+  if (-not $ffmpegHashCopied) {
+    Write-Warning "Missing ffmpeg-git-essentials.7z.sha256. Keep it for public releases to verify the exact FFmpeg archive."
+  }
+
+  Assert-FileExists -Path (Join-Path $releaseLicenseDir "FormatConv-MIT.txt") -Message "Bundled FormatConv MIT license was not found."
+  Assert-FileExists -Path (Join-Path $releaseLicenseDir "FFmpeg-GPLv3.txt") -Message "Bundled FFmpeg GPLv3 notice was not found."
+  Assert-FileExists -Path (Join-Path $releaseLicenseDir "ImageMagick-LICENSE.txt") -Message "Bundled ImageMagick license was not found."
+  Assert-FileExists -Path (Join-Path $releaseLicenseDir "THIRD_PARTY_NOTICES.txt") -Message "Bundled third-party notices were not found."
+
+  Write-Host "License notices bundled into: $releaseLicenseDir"
+}
+
 Write-Host "Building Go shared library (x64)..."
 Push-Location $GoDir
 try {
@@ -133,5 +215,8 @@ if ($Mode -ne "release") {
 
 Write-Host "Bundling external tools..."
 Copy-ExternalTools -ReleaseDir $ReleaseDir
+
+Write-Host "Bundling license notices..."
+Copy-LicenseFiles -ReleaseDir $ReleaseDir
 
 Write-Host "Windows build complete."

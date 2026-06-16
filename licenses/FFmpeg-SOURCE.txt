@@ -1,0 +1,35 @@
+FFmpeg Source Tracking
+======================
+
+Current package name:
+
+  ffmpeg-git-essentials.7z
+
+Download page:
+
+  https://www.gyan.dev/ffmpeg/builds/
+
+Direct binary archive URL:
+
+  https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z
+
+Important:
+
+  ffmpeg-git-essentials.7z is a rolling git build. The exact FFmpeg source
+  commit may change when the archive is downloaded again.
+
+For each public FormatConv release:
+
+  1. Save the exact ffmpeg-git-essentials.7z archive used.
+  2. Save the matching ffmpeg-git-essentials.7z.ver file.
+  3. Save the matching ffmpeg-git-essentials.7z.sha256 file.
+  4. Record the FFmpeg source commit shown on the gyan.dev builds page.
+  5. Provide the corresponding FFmpeg source link or source archive in the
+     GitHub/Gitee Release notes.
+
+For the gyan.dev build page observed on 2026-06-16, the listed git build was:
+
+  Version: 2026-06-15-git-44d082edc8
+  Source commit: https://github.com/FFmpeg/FFmpeg/commit/44d082edc8
+
+Update this file if a newer rolling build is used.

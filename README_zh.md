@@ -1,27 +1,26 @@
 # FormatConv
 
-FormatConv 是一个面向 Windows 的本地格式转换工具，支持视频、图像和音频文件转换，并提供无损优先、可选有损压缩和批量转换能力。
+FormatConv 是一个面向 Windows 的本地格式转换工具，支持视频、音频和图片批量转换，并提供压缩率、编码格式、输出目录、历史记录和中英双语界面等功能。
 
-## 功能特性
+## 功能
 
-- **Windows 桌面应用**：使用 Flutter 构建界面，Go 原生库负责转换逻辑。
-- **多类型格式支持**：视频（MP4、MKV、MOV、AVI、WebM）、图像（JPEG、PNG、WebP、TIFF、BMP）、音频（MP3、FLAC、WAV、AAC、OGG）。
-- **无损优先**：默认使用无损转换，也可按需选择有损质量。
-- **批量转换**：一次选择多个文件并统一转换。
-- **拖拽选择**：支持拖放文件，也支持文件选择器。
-- **实时进度**：转换过程中显示进度和结果状态。
-- **中英双语界面**：应用内可在 English / 中文之间切换。
+- **Windows 桌面应用**：Flutter 构建界面，Go 原生库负责转换逻辑。
+- **多类型格式支持**：视频、音频、图片三类格式转换。
+- **拖拽操作**：支持从资源管理器拖入文件，并将文件拖到目标格式卡片上转换。
+- **批量转换**：支持多选文件和同类型批量处理。
+- **本地工具打包**：内测安装包可随附 FFmpeg 和 ImageMagick，用户无需单独安装。
+- **双语和主题**：支持中文/English、浅色/深色主题。
 
 ## 项目结构
 
 ```text
 apps/       Flutter Windows 应用
 native/     Go FFI 转换引擎
-docs/       开发和用户文档
-DESIGN.md   界面设计风格参考
+licenses/   安装包许可证和第三方声明模板
+third_party/ 本地第三方工具缓存，不提交到仓库
 ```
 
-`apps/lib/` 存放 Flutter 业务代码，包含 `screens/`、`widgets/`、`services/`、`providers/`、`models/` 和 `utils/`。`native/converter/` 存放格式检测和 FFmpeg/ImageMagick 调用逻辑。
+`apps/lib/` 存放 Flutter 业务代码，包括 `screens/`、`widgets/`、`services/`、`providers/`、`models/` 和 `utils/`。`native/converter/` 存放格式检测和 FFmpeg/ImageMagick 调用逻辑。
 
 ## 环境要求
 
@@ -29,95 +28,86 @@ DESIGN.md   界面设计风格参考
 - Flutter 3.44.2
 - Dart SDK 3.12.2
 - Go 1.21+
-- FFmpeg 6.x
-- ImageMagick 7.x
 
-## 构建
+## 本地工具准备
 
-推荐使用 Windows PowerShell：
-
-```powershell
-cd apps
-.\scripts\build_windows.ps1 -Mode release
-```
-
-该脚本会先在 `native/` 构建 `format_conv.dll`，再构建 Flutter Windows 应用。
-
-Flutter Windows 应用和 Go 原生 DLL 均构建为 x64。
-
-## 本地运行
-
-```powershell
-cd apps
-flutter run -d windows
-```
-
-如果只想构建 Go 动态库：
-
-```powershell
-cd native
-make build-windows
-```
-
-## 测试
-
-Flutter 测试：
-
-```powershell
-cd apps
-flutter test
-```
-
-Go 测试：
-
-```powershell
-cd native
-go test ./...
-```
-
-## 使用说明
-
-1. 启动应用。
-2. 在右上角选择 English 或 中文。
-3. 点击“浏览文件”或拖入文件。
-4. 选择目标格式。
-5. 按需选择无损/有损、质量或编码器。
-6. 等待进度完成，在结果区查看输出文件。
-
-## 许可证
-
-MIT License
-
-## 内测版外部工具打包
-
-内测版推荐随软件打包 FFmpeg 和 ImageMagick，用户不需要手动安装。
-
-开发者本地构建前，请准备以下目录：
+内测版推荐随软件打包 FFmpeg 和 ImageMagick。构建前准备：
 
 ```text
 third_party/tools/windows/
   ffmpeg/
     ffmpeg.exe
     ffprobe.exe
+    ffmpeg-git-essentials.7z.ver      可选，正式发布建议保留
+    ffmpeg-git-essentials.7z.sha256   可选，正式发布建议保留
   imagemagick/
     magick.exe
+    LICENSE.txt
+    NOTICE.txt
     其他 ImageMagick portable 文件
 ```
 
-构建脚本会把工具复制到发布目录：
+当前记录的下载来源：
+
+- FFmpeg: <https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z>
+- ImageMagick: <https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-25/ImageMagick-7.1.2-25-portable-Q16-x64.7z>
+
+ImageMagick 应保留 portable 包内的完整文件集，不建议只复制 `magick.exe`。
+
+## 构建
+
+推荐使用 Windows PowerShell：
+
+```powershell
+cd D:\Coding\formatConv\apps
+.\scripts\build_windows.ps1 -Mode release
+```
+
+脚本会构建 Go DLL、构建 Flutter Windows 应用，并复制：
 
 ```text
 apps/build/windows/x64/runner/Release/
-  format_conv.exe
-  format_conv.dll
-  data/
   tools/
     ffmpeg.exe
     ffprobe.exe
     magick.exe
     ImageMagick portable 其他文件
+  licenses/
+    FormatConv-MIT.txt
+    FFmpeg-GPLv3.txt
+    FFmpeg-SOURCE.txt
+    ImageMagick-LICENSE.txt
+    THIRD_PARTY_NOTICES.txt
 ```
 
-FFmpeg 通常只需要 `ffmpeg.exe` 和 `ffprobe.exe`。ImageMagick 不建议只复制 `magick.exe`，应保留 portable 包内的相关文件，避免部分图片格式在其他机器上转换失败。
+## 本地运行
 
-注意许可证：正式发布前需要确认所使用的 FFmpeg 构建版本是 GPL 还是 LGPL，并随安装包附带相应许可证。ImageMagick 也应附带对应 license 文件。
+```powershell
+cd D:\Coding\formatConv\apps
+flutter run -d windows
+```
+
+## 测试
+
+```powershell
+cd D:\Coding\formatConv\apps
+flutter analyze
+flutter test
+
+cd D:\Coding\formatConv\native
+go test ./...
+```
+
+## 第三方组件与许可证
+
+FormatConv 项目源码使用 MIT License。Windows 安装包中随附的 FFmpeg、ImageMagick 和 MiSans 字体是第三方组件，不纳入 FormatConv 的 MIT 授权范围。
+
+- FFmpeg：当前使用 gyan.dev `ffmpeg-git-essentials.7z`，按 GPLv3 处理。
+- ImageMagick：当前使用 `ImageMagick-7.1.2-25-portable-Q16-x64.7z`，按 ImageMagick License 处理。
+- MiSans：按字体上游授权处理，不默认归入 MIT。
+
+发布安装包前请检查 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，并确保安装目录中包含 `licenses/`。
+
+## 许可证
+
+FormatConv 源码采用 MIT License。详见 [LICENSE](LICENSE)。

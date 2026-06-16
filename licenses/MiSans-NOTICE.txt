@@ -1,0 +1,13 @@
+MiSans Font Notice
+==================
+
+FormatConv bundles MiSans font files under:
+
+  apps/assets/fonts/
+
+MiSans is a third-party font asset and is not licensed under the FormatConv MIT
+License.
+
+Before a public release, include the upstream MiSans license or permission notice
+from the font owner/distributor in this file and in the installer licenses
+directory.

@@ -2047,6 +2047,27 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       title: strings.about,
       children: [
         Text(strings.aboutBody, style: const TextStyle(height: 1.45)),
+        _SettingsSectionCard(
+          title: strings.thirdPartyLicenses,
+          children: [
+            Text(
+              strings.ffmpegThirdPartyNotice,
+              style: TextStyle(color: _themeTokens(context).ink, height: 1.45),
+            ),
+            Text(
+              strings.imageMagickThirdPartyNotice,
+              style: TextStyle(color: _themeTokens(context).ink, height: 1.45),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _openBundledThirdPartyNotices,
+                icon: const Icon(Icons.description_outlined),
+                label: Text(strings.openThirdPartyNotices),
+              ),
+            ),
+          ],
+        ),
         _SupportLinkRow(
           strings: strings,
           serviceLabel: strings.github,
@@ -3148,6 +3169,24 @@ void _openPath(String path) {
   if (Platform.isWindows) {
     Process.run('start', ['', path], runInShell: true);
   }
+}
+
+void _openBundledThirdPartyNotices() {
+  if (!Platform.isWindows) return;
+
+  final executableDir = p.dirname(Platform.resolvedExecutable);
+  final candidates = [
+    p.join(executableDir, 'licenses', 'THIRD_PARTY_NOTICES.txt'),
+    p.join(Directory.current.path, 'licenses', 'THIRD_PARTY_NOTICES.txt'),
+    p.join(Directory.current.path, '..', 'THIRD_PARTY_NOTICES.md'),
+    p.join(Directory.current.path, 'THIRD_PARTY_NOTICES.md'),
+  ];
+  final noticePath = candidates.firstWhere(
+    (candidate) => File(candidate).existsSync(),
+    orElse: () => candidates.first,
+  );
+
+  _openPath(noticePath);
 }
 
 List<String> _codecsFor(String format, _FileTab type) {

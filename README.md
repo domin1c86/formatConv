@@ -61,4 +61,23 @@ See [USER_GUIDE.md](docs/USER_GUIDE.md) for user instructions.
 
 ## License
 
-MIT License
+FormatConv source code is licensed under the MIT License.
+
+## Third-Party Components
+
+Windows internal builds may bundle external tools under `Release/tools/`:
+
+- FFmpeg: `ffmpeg.exe` and `ffprobe.exe`
+  - Package: `ffmpeg-git-essentials.7z`
+  - Source: <https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z>
+  - Builds page: <https://www.gyan.dev/ffmpeg/builds/>
+  - License: GPLv3 for the bundled gyan.dev build
+- ImageMagick: `magick.exe` and its portable package files
+  - Package: `ImageMagick-7.1.2-25-portable-Q16-x64.7z`
+  - Source: <https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-25>
+  - License: ImageMagick License
+- MiSans fonts are bundled as third-party font assets and are not covered by
+  the FormatConv MIT License.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for release packaging
+requirements. Installer builds copy notices into `Release/licenses/`.

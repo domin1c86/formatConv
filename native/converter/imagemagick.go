@@ -142,5 +142,5 @@ func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options mode
 }
 
 func (e *ImageMagickEngine) SupportedFormats() []string {
-	return []string{"JPEG", "PNG", "WebP", "TIFF", "BMP", "GIF", "ICO", "SVG"}
+	return []string{"JPEG", "JPG", "PNG", "WebP", "TIFF", "BMP", "GIF", "ICO", "SVG"}
 }

@@ -1,0 +1,33 @@
+FFmpeg GPLv3 Notice
+===================
+
+This distribution may include FFmpeg executables from the gyan.dev Windows
+builds project:
+
+  ffmpeg.exe
+  ffprobe.exe
+
+Package:
+
+  ffmpeg-git-essentials.7z
+
+Source:
+
+  https://www.gyan.dev/ffmpeg/builds/ffmpeg-git-essentials.7z
+  https://www.gyan.dev/ffmpeg/builds/
+
+The gyan.dev builds page states that its Windows FFmpeg builds are static and
+licensed as GPLv3. FFmpeg itself is a separate third-party project and is not
+licensed under the FormatConv MIT License.
+
+Official GPLv3 license text:
+
+  https://www.gnu.org/licenses/gpl-3.0.txt
+
+FFmpeg legal information:
+
+  https://ffmpeg.org/legal.html
+
+For public releases, provide the corresponding FFmpeg source commit or source
+archive alongside the installer. If using the rolling git build, also keep the
+matching .ver and .sha256 files from gyan.dev for the exact archive used.

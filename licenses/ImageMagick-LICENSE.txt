@@ -1,0 +1,26 @@
+ImageMagick License Notice
+==========================
+
+This distribution may include ImageMagick portable files from:
+
+  ImageMagick-7.1.2-25-portable-Q16-x64.7z
+
+Source release:
+
+  https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-25
+
+Binary archive:
+
+  https://github.com/ImageMagick/ImageMagick/releases/download/7.1.2-25/ImageMagick-7.1.2-25-portable-Q16-x64.7z
+
+Official license:
+
+  https://imagemagick.org/license/
+
+ImageMagick is licensed separately by ImageMagick Studio LLC and is not licensed
+under the FormatConv MIT License.
+
+When building a release installer, prefer copying the upstream LICENSE.txt and
+NOTICE.txt files from the exact portable package into the installer licenses
+directory. The build script does this automatically when those files are present
+in third_party/tools/windows/imagemagick/.
