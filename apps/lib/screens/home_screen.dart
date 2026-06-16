@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -5,6 +6,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 
 import '../l10n/app_strings.dart';
@@ -13,13 +15,12 @@ import '../models/conversion_options.dart';
 import '../models/conversion_result.dart';
 import '../providers/conversion_provider.dart';
 import '../providers/settings_provider.dart';
-import '../widgets/progress_indicator.dart';
 
 enum _FileTab { all, video, audio, image }
 
 enum _RightTab { formats, results }
 
-enum _SettingsTab { general, preferences, advanced, custom, about }
+enum _SettingsTab { general, preferences, advanced, about }
 
 const _videoExtensions = {
   '.mp4',
@@ -67,6 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   _RightTab _rightTab = _RightTab.formats;
   bool _showHistory = false;
   int _page = 0;
+  final Set<String> _selectedFileCards = {};
 
   @override
   Widget build(BuildContext context) {
@@ -89,14 +91,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       SizedBox(
                         height: math.max(520, constraints.maxHeight * 0.48),
                         child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            fontFamily: settings.leftPaneFontFamily.isEmpty
-                                ? null
-                                : settings.leftPaneFontFamily,
-                          ),
+                          style: const TextStyle(fontFamily: 'MiSans'),
                           child: _LeftPane(
                             strings: strings,
                             provider: provider,
+                            selectedFiles: _selectedFileCards,
                             fileTab: _fileTab,
                             page: _page,
                             onFileTabChanged: (tab) => setState(() {
@@ -105,23 +104,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             }),
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
+                            onFileSelectionChanged: _toggleFileSelection,
                             onOpenSettings: () =>
-                                _showSettings(strings, settingsController),
+                                _showSettings(settingsController),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
                       Expanded(
                         child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            fontFamily: settings.rightPaneFontFamily.isEmpty
-                                ? null
-                                : settings.rightPaneFontFamily,
-                          ),
+                          style: const TextStyle(fontFamily: 'MiSans'),
                           child: _RightPane(
                             strings: strings,
                             provider: provider,
                             settingsController: settingsController,
+                            selectedFiles: _selectedFileCards,
                             rightTab: _rightTab,
                             showHistory: _showHistory,
                             onRightTabChanged: (tab) =>
@@ -140,14 +137,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       SizedBox(
                         width: contentWidth * 0.34,
                         child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            fontFamily: settings.leftPaneFontFamily.isEmpty
-                                ? null
-                                : settings.leftPaneFontFamily,
-                          ),
+                          style: const TextStyle(fontFamily: 'MiSans'),
                           child: _LeftPane(
                             strings: strings,
                             provider: provider,
+                            selectedFiles: _selectedFileCards,
                             fileTab: _fileTab,
                             page: _page,
                             onFileTabChanged: (tab) => setState(() {
@@ -156,23 +150,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             }),
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
+                            onFileSelectionChanged: _toggleFileSelection,
                             onOpenSettings: () =>
-                                _showSettings(strings, settingsController),
+                                _showSettings(settingsController),
                           ),
                         ),
                       ),
                       const SizedBox(width: 18),
                       Expanded(
                         child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            fontFamily: settings.rightPaneFontFamily.isEmpty
-                                ? null
-                                : settings.rightPaneFontFamily,
-                          ),
+                          style: const TextStyle(fontFamily: 'MiSans'),
                           child: _RightPane(
                             strings: strings,
                             provider: provider,
                             settingsController: settingsController,
+                            selectedFiles: _selectedFileCards,
                             rightTab: _rightTab,
                             showHistory: _showHistory,
                             onRightTabChanged: (tab) =>
@@ -205,35 +197,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _showSettings(
-      AppStrings strings, SettingsController controller) {
+  Future<void> _showSettings(SettingsController controller) {
     return showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
       builder: (context) => _SettingsDialog(
-        strings: strings,
         controller: controller,
       ),
     );
+  }
+
+  void _toggleFileSelection(String filePath) {
+    setState(() {
+      if (_selectedFileCards.contains(filePath)) {
+        _selectedFileCards.remove(filePath);
+      } else {
+        _selectedFileCards.add(filePath);
+      }
+    });
   }
 }
 
 class _LeftPane extends StatelessWidget {
   final AppStrings strings;
   final ConversionProvider provider;
+  final Set<String> selectedFiles;
   final _FileTab fileTab;
   final int page;
   final ValueChanged<_FileTab> onFileTabChanged;
   final ValueChanged<int> onPageChanged;
+  final ValueChanged<String> onFileSelectionChanged;
   final VoidCallback onOpenSettings;
 
   const _LeftPane({
     required this.strings,
     required this.provider,
+    required this.selectedFiles,
     required this.fileTab,
     required this.page,
     required this.onFileTabChanged,
     required this.onPageChanged,
+    required this.onFileSelectionChanged,
     required this.onOpenSettings,
   });
 
@@ -242,7 +246,8 @@ class _LeftPane extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final controlHeightBudget = constraints.maxHeight * 0.16;
-        final settingsHeight = math.min(54.0, math.max(46.0, controlHeightBudget * 0.36));
+        final settingsHeight =
+            math.min(54.0, math.max(46.0, controlHeightBudget * 0.36));
         final addHeight = math.min(
           92.0,
           math.max(76.0, controlHeightBudget - settingsHeight),
@@ -262,11 +267,14 @@ class _LeftPane extends StatelessWidget {
               child: _AddedFilesPanel(
                 strings: strings,
                 files: provider.selectedFiles,
+                selectedFiles: selectedFiles,
+                processedFiles: provider.processedFiles,
                 selectedTab: fileTab,
                 page: page,
                 onFilesAdded: provider.addFiles,
                 onTabChanged: onFileTabChanged,
                 onPageChanged: onPageChanged,
+                onFileSelectionChanged: onFileSelectionChanged,
               ),
             ),
             const SizedBox(height: 12),
@@ -332,76 +340,75 @@ class _AddFilesTileState extends State<_AddFilesTile> {
             }
           },
           child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: _dragging
-                ? tokens.primary.withValues(alpha: 0.12)
-                : _hovering
-                    ? tokens.hover
-                    : tokens.surface,
-            borderRadius: BorderRadius.circular(tokens.cardRadius),
-            border: Border.all(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
               color: _dragging
-                  ? tokens.primary
-                  : tokens.border,
-              width: _dragging ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: tokens.surfaceMuted,
-                  borderRadius: BorderRadius.circular(math.max(0, tokens.cardRadius - 2)),
-                ),
-                child: const Icon(Icons.add_rounded, size: 24),
+                  ? tokens.primary.withValues(alpha: 0.12)
+                  : _hovering
+                      ? tokens.hover
+                      : tokens.surface,
+              borderRadius: BorderRadius.circular(tokens.cardRadius),
+              border: Border.all(
+                color: _dragging ? tokens.primary : tokens.border,
+                width: _dragging ? 2 : 1,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: SizedBox(
-                    width: 260,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.strings.addFiles,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            height: 1.15,
-                            fontWeight: FontWeight.w600,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: tokens.surfaceMuted,
+                    borderRadius: BorderRadius.circular(
+                        math.max(0, tokens.cardRadius - 2)),
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 260,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.strings.addFiles,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              height: 1.15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.selectedFileCount == 0
-                              ? widget.strings.dropFiles
-                              : widget.strings
-                                  .selectedCount(widget.selectedFileCount),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.15,
-                          ).copyWith(color: tokens.muted),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.selectedFileCount == 0
+                                ? widget.strings.dropFiles
+                                : widget.strings
+                                    .selectedCount(widget.selectedFileCount),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.15,
+                            ).copyWith(color: tokens.muted),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -410,20 +417,26 @@ class _AddFilesTileState extends State<_AddFilesTile> {
 class _AddedFilesPanel extends StatefulWidget {
   final AppStrings strings;
   final List<String> files;
+  final Set<String> selectedFiles;
+  final Set<String> processedFiles;
   final _FileTab selectedTab;
   final int page;
   final ValueChanged<List<String>> onFilesAdded;
   final ValueChanged<_FileTab> onTabChanged;
   final ValueChanged<int> onPageChanged;
+  final ValueChanged<String> onFileSelectionChanged;
 
   const _AddedFilesPanel({
     required this.strings,
     required this.files,
+    required this.selectedFiles,
+    required this.processedFiles,
     required this.selectedTab,
     required this.page,
     required this.onFilesAdded,
     required this.onTabChanged,
     required this.onPageChanged,
+    required this.onFileSelectionChanged,
   });
 
   @override
@@ -439,8 +452,17 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
     final tabs = _availableTabs(widget.files, widget.strings);
     final filtered = widget.files
         .where((file) => _matchesTab(file, widget.selectedTab))
-        .toList();
-    const pageSize = 12;
+        .toList()
+      ..sort((a, b) {
+        final aDone = widget.processedFiles.contains(a);
+        final bDone = widget.processedFiles.contains(b);
+        if (aDone != bDone) return aDone ? 1 : -1;
+        return p
+            .basename(a)
+            .toLowerCase()
+            .compareTo(p.basename(b).toLowerCase());
+      });
+    const pageSize = 24;
     final totalPages = math.max(1, (filtered.length / pageSize).ceil());
     final currentPage = widget.page.clamp(0, totalPages - 1).toInt();
     final visible =
@@ -460,18 +482,34 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
           color: _dragging ? tokens.hover : tokens.surface,
           borderRadius: BorderRadius.circular(tokens.cardRadius + 4),
           border: Border.all(
-            color: _dragging
-                ? tokens.primary
-                : tokens.border,
+            color: _dragging ? tokens.primary : tokens.border,
             width: _dragging ? 2 : 1,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.strings.addedFiles,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.strings.addedFiles,
+                    style: TextStyle(
+                      color: tokens.ink,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (widget.selectedFiles.isNotEmpty)
+                  Text(
+                    widget.strings.selectedCardCount(
+                      widget.selectedFiles.length,
+                    ),
+                    style: TextStyle(color: tokens.muted, fontSize: 12),
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
             _TabStrip<_FileTab>(
               tabs: tabs,
@@ -490,17 +528,31 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
                   : LayoutBuilder(
                       builder: (context, constraints) {
                         final columns = constraints.maxWidth >= 420 ? 3 : 2;
+                        final denseColumns =
+                            (constraints.maxWidth / 112).floor().clamp(3, 6);
                         return GridView.builder(
                           itemCount: visible.length,
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: columns,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 1.05,
+                            crossAxisCount: constraints.maxWidth >= 360
+                                ? denseColumns
+                                : columns,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            childAspectRatio: 0.82,
                           ),
-                          itemBuilder: (context, index) =>
-                              _FileCard(filePath: visible[index]),
+                          itemBuilder: (context, index) {
+                            final file = visible[index];
+                            return _FileCard(
+                              key: ValueKey(file),
+                              filePath: file,
+                              selected: widget.selectedFiles.contains(file),
+                              processed: widget.processedFiles.contains(file),
+                              selectedFiles: widget.selectedFiles,
+                              onToggleSelected: () =>
+                                  widget.onFileSelectionChanged(file),
+                            );
+                          },
                         );
                       },
                     ),
@@ -550,8 +602,19 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
 
 class _FileCard extends StatefulWidget {
   final String filePath;
+  final bool selected;
+  final bool processed;
+  final Set<String> selectedFiles;
+  final VoidCallback onToggleSelected;
 
-  const _FileCard({required this.filePath});
+  const _FileCard({
+    super.key,
+    required this.filePath,
+    required this.selected,
+    required this.processed,
+    required this.selectedFiles,
+    required this.onToggleSelected,
+  });
 
   @override
   State<_FileCard> createState() => _FileCardState();
@@ -565,6 +628,9 @@ class _FileCardState extends State<_FileCard> {
     final tokens = _themeTokens(context);
     final name = p.basename(widget.filePath);
     final type = _fileType(widget.filePath);
+    final accent =
+        (widget.processed ? const Color(0xFF52FF88) : _typeColor(type))
+            .withValues(alpha: _hovering ? 0.5 : 1);
     final icon = switch (type) {
       _FileTab.video => Icons.movie_outlined,
       _FileTab.audio => Icons.graphic_eq_rounded,
@@ -574,65 +640,184 @@ class _FileCardState extends State<_FileCard> {
 
     final child = AnimatedContainer(
       duration: const Duration(milliseconds: 140),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: _hovering ? tokens.hover : tokens.surfaceMuted,
+        color: _hovering
+            ? tokens.primary.withValues(alpha: 0.16)
+            : tokens.surfaceMuted,
         borderRadius: BorderRadius.circular(tokens.cardRadius),
         border: Border.all(
-          color: _hovering ? tokens.primary : tokens.border,
+          color: widget.selected
+              ? tokens.primary
+              : _hovering
+                  ? tokens.primary
+                  : tokens.border,
+          width: widget.selected ? 2.8 : 1.5,
         ),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: tokens.surface,
-                borderRadius: BorderRadius.circular(math.max(0, tokens.cardRadius - 2)),
-                border: Border.all(color: tokens.border),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                decoration: BoxDecoration(
+                  borderRadius:
+                      BorderRadius.circular(math.max(0, tokens.cardRadius - 4)),
+                  border: Border.all(color: accent, width: 2),
+                ),
               ),
-              child: type == _FileTab.image
-                  ? Image.file(
-                      File(widget.filePath),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
-                        icon,
-                        size: 34,
-                        color: tokens.muted,
-                      ),
-                    )
-                  : Icon(icon, size: 34, color: tokens.muted),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w500, height: 1.15),
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: tokens.surface,
+                      borderRadius: BorderRadius.circular(
+                          math.max(0, tokens.cardRadius - 7)),
+                      border: Border.all(color: tokens.border),
+                    ),
+                    child: switch (type) {
+                      _FileTab.image => Image.file(
+                          File(widget.filePath),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            icon,
+                            size: 26,
+                            color: tokens.muted,
+                          ),
+                        ),
+                      _FileTab.video => _VideoPreview(
+                          filePath: widget.filePath,
+                          fallback: Icon(icon, size: 26, color: tokens.muted),
+                        ),
+                      _ => Icon(icon, size: 26, color: tokens.muted),
+                    },
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Tooltip(
+                  message: name,
+                  waitDuration: const Duration(milliseconds: 1500),
+                  child: Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: tokens.ink,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
 
+    final dragFiles = widget.selected && widget.selectedFiles.isNotEmpty
+        ? widget.selectedFiles.toList()
+        : [widget.filePath];
+
     return Draggable<List<String>>(
-      data: [widget.filePath],
+      data: dragFiles,
       feedback: Material(
         color: Colors.transparent,
-        child: SizedBox(width: 130, height: 130, child: child),
+        child: SizedBox(width: 96, height: 116, child: child),
       ),
       childWhenDragging: Opacity(opacity: 0.45, child: child),
       child: MouseRegion(
         cursor: SystemMouseCursors.grab,
         onEnter: (_) => setState(() => _hovering = true),
         onExit: (_) => setState(() => _hovering = false),
-        child: child,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.grab,
+          hoverColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+          onTap: widget.onToggleSelected,
+          child: child,
+        ),
       ),
     );
+  }
+}
+
+class _VideoPreview extends StatefulWidget {
+  final String filePath;
+  final Widget fallback;
+
+  const _VideoPreview({required this.filePath, required this.fallback});
+
+  @override
+  State<_VideoPreview> createState() => _VideoPreviewState();
+}
+
+class _VideoPreviewState extends State<_VideoPreview> {
+  late final Future<File?> _thumbnail = _loadThumbnail();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _thumbnail,
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+        if (file != null && file.existsSync()) {
+          return Image.file(
+            file,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => widget.fallback,
+          );
+        }
+        return widget.fallback;
+      },
+    );
+  }
+
+  Future<File?> _loadThumbnail() async {
+    final cacheDir = Directory(p.join(
+      Directory.systemTemp.path,
+      'formatconv_video_thumbnails',
+    ));
+    try {
+      cacheDir.createSync(recursive: true);
+      final stat = File(widget.filePath).statSync();
+      final cacheKey =
+          '${widget.filePath.hashCode.abs()}_${stat.modified.millisecondsSinceEpoch}';
+      final output = File(p.join(cacheDir.path, '$cacheKey.jpg'));
+      if (output.existsSync()) return output;
+
+      final ffmpeg = _resolveFfmpegExecutable();
+      final result = await Process.run(
+        ffmpeg,
+        [
+          '-y',
+          '-ss',
+          '00:00:01',
+          '-i',
+          widget.filePath,
+          '-frames:v',
+          '1',
+          '-vf',
+          'scale=240:-1',
+          output.path,
+        ],
+        runInShell: false,
+      );
+      if (result.exitCode == 0 && output.existsSync()) return output;
+    } catch (_) {}
+    return null;
   }
 }
 
@@ -640,6 +825,7 @@ class _RightPane extends StatelessWidget {
   final AppStrings strings;
   final ConversionProvider provider;
   final SettingsController settingsController;
+  final Set<String> selectedFiles;
   final _RightTab rightTab;
   final bool showHistory;
   final ValueChanged<_RightTab> onRightTabChanged;
@@ -650,6 +836,7 @@ class _RightPane extends StatelessWidget {
     required this.strings,
     required this.provider,
     required this.settingsController,
+    required this.selectedFiles,
     required this.rightTab,
     required this.showHistory,
     required this.onRightTabChanged,
@@ -677,6 +864,7 @@ class _RightPane extends StatelessWidget {
                     strings: strings,
                     provider: provider,
                     settingsController: settingsController,
+                    selectedFiles: selectedFiles,
                     onShowResults: () => onRightTabChanged(_RightTab.results),
                   )
                 : _ResultsView(
@@ -688,14 +876,6 @@ class _RightPane extends StatelessWidget {
                     onShowCurrent: onShowCurrent,
                   ),
           ),
-          if (provider.isConverting) ...[
-            const SizedBox(height: 12),
-            ConversionProgress(
-              strings: strings,
-              progress: provider.progress,
-              onCancel: provider.cancelConversion,
-            ),
-          ],
           if (provider.error != null) ...[
             const SizedBox(height: 12),
             _ErrorBanner(message: provider.error!),
@@ -710,12 +890,14 @@ class _FormatSelection extends StatefulWidget {
   final AppStrings strings;
   final ConversionProvider provider;
   final SettingsController settingsController;
+  final Set<String> selectedFiles;
   final VoidCallback onShowResults;
 
   const _FormatSelection({
     required this.strings,
     required this.provider,
     required this.settingsController,
+    required this.selectedFiles,
     required this.onShowResults,
   });
 
@@ -728,59 +910,82 @@ class _FormatSelectionState extends State<_FormatSelection> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     final settings = widget.settingsController.settings;
-    final files = widget.provider.selectedFiles;
-    final hasVideo = files.any((file) => _fileType(file) == _FileTab.video);
+    final files = widget.selectedFiles.isNotEmpty
+        ? widget.selectedFiles.toList()
+        : widget.provider.selectedFiles;
+    final hasVideo = files
+        .any((file) => _fileType(file) == _FileTab.video || _isGifFile(file));
     final hasAudio = files.any((file) => _fileType(file) == _FileTab.audio);
     final hasImage = files.any((file) => _fileType(file) == _FileTab.image);
+    final showVideoToGif = hasVideo && !hasAudio && !hasImage;
+    final imageFormats = supportedImageFormats.where((format) {
+      if (!settings.visibleImageFormats.contains(format)) return false;
+      return hasImage || (showVideoToGif && format.toUpperCase() == 'GIF');
+    }).toList();
 
-    return ListView(
+    final content = <Widget>[
+      if (files.isEmpty)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: Text(
+            widget.strings.emptyFormatHint,
+            style: TextStyle(color: tokens.muted),
+          ),
+        ),
+      if (hasVideo)
+        _FormatRow(
+          title: widget.strings.videoFormats,
+          type: _FileTab.video,
+          formats: supportedVideoFormats
+              .where(settings.visibleVideoFormats.contains)
+              .toList(),
+          strings: widget.strings,
+          getOptions: _getOptions,
+          onOptionsChanged: _setOptions,
+          onConvert: _convert,
+        ),
+      if (hasAudio)
+        _FormatRow(
+          title: widget.strings.audioFormats,
+          type: _FileTab.audio,
+          formats: supportedAudioFormats
+              .where(settings.visibleAudioFormats.contains)
+              .toList(),
+          strings: widget.strings,
+          getOptions: _getOptions,
+          onOptionsChanged: _setOptions,
+          onConvert: _convert,
+        ),
+      if (imageFormats.isNotEmpty)
+        _FormatRow(
+          title: widget.strings.imageFormats,
+          type: _FileTab.image,
+          formats: imageFormats,
+          strings: widget.strings,
+          getOptions: _getOptions,
+          onOptionsChanged: _setOptions,
+          onConvert: _convert,
+        ),
+      if (!hasVideo && !hasAudio && !hasImage && files.isNotEmpty)
+        Text(
+          widget.strings.unsupportedFileType,
+          style: const TextStyle(color: Color(0xFFE6A23C)),
+        ),
+      const SizedBox(height: 164),
+    ];
+
+    return Stack(
       children: [
-        if (files.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: Text(widget.strings.emptyFormatHint,
-                style: const TextStyle(color: Color(0xFF6E6E73))),
+        ListView(children: content),
+        if (widget.provider.conversionTasks.isNotEmpty)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _ConversionTaskShelf(tasks: widget.provider.conversionTasks),
           ),
-        if (hasVideo)
-          _FormatRow(
-            title: widget.strings.videoFormats,
-            type: _FileTab.video,
-            formats: supportedVideoFormats
-                .where(settings.visibleVideoFormats.contains)
-                .toList(),
-            strings: widget.strings,
-            getOptions: _getOptions,
-            onOptionsChanged: _setOptions,
-            onConvert: _convert,
-          ),
-        if (hasAudio)
-          _FormatRow(
-            title: widget.strings.audioFormats,
-            type: _FileTab.audio,
-            formats: supportedAudioFormats
-                .where(settings.visibleAudioFormats.contains)
-                .toList(),
-            strings: widget.strings,
-            getOptions: _getOptions,
-            onOptionsChanged: _setOptions,
-            onConvert: _convert,
-          ),
-        if (hasImage)
-          _FormatRow(
-            title: widget.strings.imageFormats,
-            type: _FileTab.image,
-            formats: supportedImageFormats
-                .where(settings.visibleImageFormats.contains)
-                .toList(),
-            strings: widget.strings,
-            getOptions: _getOptions,
-            onOptionsChanged: _setOptions,
-            onConvert: _convert,
-          ),
-        if (!hasVideo && !hasAudio && !hasImage && files.isNotEmpty)
-          Text(widget.strings.unsupportedFileType,
-              style: const TextStyle(color: Color(0xFFB35A00))),
       ],
     );
   }
@@ -795,7 +1000,30 @@ class _FormatSelectionState extends State<_FormatSelection> {
     setState(() => _options[format] = options);
   }
 
-  Future<void> _convert(String format, List<String>? files) async {
+  Future<void> _convert(
+    BuildContext context,
+    _FileTab type,
+    String format,
+    List<String>? files,
+  ) async {
+    final sourceFiles = files ??
+        (widget.selectedFiles.isNotEmpty
+            ? widget.selectedFiles.toList()
+            : widget.provider.selectedFiles);
+    final compatible = _compatibleFiles(type, format, sourceFiles);
+    final skipped = sourceFiles
+        .where((file) => !compatible.contains(file))
+        .map(p.basename)
+        .toList();
+
+    if (skipped.isNotEmpty) {
+      _showTopNotice(
+        context,
+        '${widget.strings.typeMismatchTitle}\n${widget.strings.typeMismatchMessage(skipped)}',
+      );
+    }
+    if (compatible.isEmpty) return;
+
     final currentSettings = widget.settingsController.settings;
     AppSettings effectiveSettings = currentSettings;
     if (currentSettings.askBeforeConvert) {
@@ -807,17 +1035,196 @@ class _FormatSelectionState extends State<_FormatSelection> {
           currentSettings.copyWith(defaultOutputDirectory: selectedDirectory);
     }
 
-    widget.provider.startConversion(
+    await widget.provider.startConversion(
       format,
       _getOptions(format).copyWith(
         overwrite: effectiveSettings.overwriteSource,
         gpuAcceleration: effectiveSettings.gpuAcceleration,
       ),
-      files: files,
+      files: compatible,
       settings: effectiveSettings,
       onResult: widget.settingsController.addHistory,
     );
-    widget.onShowResults();
+  }
+}
+
+class _ConversionTaskShelf extends StatelessWidget {
+  final List<ConversionTask> tasks;
+
+  const _ConversionTaskShelf({required this.tasks});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return Center(
+      child: Container(
+        width: 420,
+        height: 140,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: tokens.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(tokens.cardRadius + 4),
+          border: Border.all(color: tokens.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: tasks.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (context, index) => _ConversionTaskCard(
+            task: tasks[index],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversionTaskCard extends StatefulWidget {
+  final ConversionTask task;
+
+  const _ConversionTaskCard({required this.task});
+
+  @override
+  State<_ConversionTaskCard> createState() => _ConversionTaskCardState();
+}
+
+class _ConversionTaskCardState extends State<_ConversionTaskCard> {
+  bool _showCancel = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && !widget.task.completed) {
+        setState(() => _showCancel = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    final progress = widget.task.completed && !widget.task.failed
+        ? 1.0
+        : widget.task.progress.clamp(0.0, 1.0).toDouble();
+    const cardWidth = 96.0;
+    const cardHeight = 116.0;
+    const statusIconSize = cardHeight / 20;
+    final canOpen = widget.task.completed &&
+        !widget.task.failed &&
+        widget.task.outputPath.isNotEmpty;
+    final displayName = widget.task.outputPath.isNotEmpty
+        ? p.basename(widget.task.outputPath)
+        : p.basename(widget.task.inputPath);
+    final cancelOpacity = !_showCancel || widget.task.completed
+        ? 0.0
+        : progress >= 0.95
+            ? (1 - ((progress - 0.95) / 0.05)).clamp(0.0, 1.0).toDouble()
+            : 1.0;
+
+    return MouseRegion(
+      cursor: canOpen ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: InkWell(
+        mouseCursor: canOpen ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
+        onTap: canOpen ? () => _openPath(widget.task.outputPath) : null,
+        child: Tooltip(
+          message: displayName,
+          waitDuration: const Duration(milliseconds: 1500),
+          child: Container(
+            width: cardWidth,
+            height: cardHeight,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: tokens.surfaceMuted,
+              borderRadius: BorderRadius.circular(tokens.cardRadius),
+              border: Border.all(
+                color: canOpen ? const Color(0xFF52FF88) : tokens.border,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    width: double.infinity,
+                    height: cardHeight * progress,
+                    color: const Color(0xFF61C5FF).withValues(alpha: 0.85),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Icon(
+                          _fileType(widget.task.inputPath) == _FileTab.audio
+                              ? Icons.graphic_eq_rounded
+                              : _fileType(widget.task.inputPath) == _FileTab.image
+                                  ? Icons.image_outlined
+                                  : Icons.movie_outlined,
+                          color: tokens.ink,
+                          size: 24,
+                        ),
+                      ),
+                      Text(
+                        displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: tokens.ink,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 450),
+                    opacity: canOpen ? 1 : 0,
+                    child: SvgPicture.asset(
+                      'windows/runner/resources/finished.svg',
+                      width: statusIconSize,
+                      height: statusIconSize,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 650),
+                    opacity: cancelOpacity,
+                    child: SvgPicture.asset(
+                      'windows/runner/resources/cancel.svg',
+                      width: statusIconSize,
+                      height: statusIconSize,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -829,7 +1236,12 @@ class _FormatRow extends StatelessWidget {
   final ConversionOptions Function(String format) getOptions;
   final void Function(String format, ConversionOptions options)
       onOptionsChanged;
-  final void Function(String format, List<String>? files) onConvert;
+  final void Function(
+    BuildContext context,
+    _FileTab type,
+    String format,
+    List<String>? files,
+  ) onConvert;
 
   const _FormatRow({
     required this.title,
@@ -872,7 +1284,8 @@ class _FormatRow extends StatelessWidget {
                           options: getOptions(format),
                           onOptionsChanged: (options) =>
                               onOptionsChanged(format, options),
-                          onConvert: (files) => onConvert(format, files),
+                          onConvert: (context, files) =>
+                              onConvert(context, type, format, files),
                         ),
                       ),
                     )
@@ -892,7 +1305,7 @@ class _MiniFormatCard extends StatefulWidget {
   final String format;
   final ConversionOptions options;
   final ValueChanged<ConversionOptions> onOptionsChanged;
-  final ValueChanged<List<String>?> onConvert;
+  final void Function(BuildContext context, List<String>? files) onConvert;
 
   const _MiniFormatCard({
     required this.strings,
@@ -913,13 +1326,18 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
   @override
   Widget build(BuildContext context) {
     return DragTarget<List<String>>(
-      onWillAcceptWithDetails: (details) => details.data.isNotEmpty,
-      onAcceptWithDetails: (details) => widget.onConvert(details.data),
+      onWillAcceptWithDetails: (details) =>
+          _compatibleFiles(widget.type, widget.format, details.data).isNotEmpty,
+      onAcceptWithDetails: (details) => widget.onConvert(context, details.data),
       builder: (context, candidateData, rejectedData) {
         final tokens = _themeTokens(context);
         final active = candidateData.isNotEmpty;
+        final rejected = rejectedData.isNotEmpty;
+        final dark = Theme.of(context).brightness == Brightness.dark;
         return MouseRegion(
-          cursor: SystemMouseCursors.click,
+          cursor: rejected
+              ? SystemMouseCursors.forbidden
+              : SystemMouseCursors.click,
           onEnter: (_) => setState(() => _hovering = true),
           onExit: (_) => setState(() => _hovering = false),
           child: AnimatedContainer(
@@ -929,14 +1347,20 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
             decoration: BoxDecoration(
               color: active
                   ? tokens.primary.withValues(alpha: 0.10)
-                  : _hovering
-                      ? tokens.hover
-                      : tokens.surfaceMuted,
+                  : rejected
+                      ? (dark
+                          ? const Color(0xFF3A2022)
+                          : const Color(0xFFFFF1F1))
+                      : _hovering
+                          ? tokens.hover
+                          : tokens.surfaceMuted,
               borderRadius: BorderRadius.circular(tokens.cardRadius),
               border: Border.all(
-                color: active || _hovering
-                    ? tokens.primary
-                    : tokens.border,
+                color: rejected
+                    ? const Color(0xFFE5484D)
+                    : active || _hovering
+                        ? tokens.primary
+                        : tokens.border,
                 width: active ? 2 : 1,
               ),
             ),
@@ -946,9 +1370,11 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
                   child: InkWell(
                     mouseCursor: SystemMouseCursors.click,
                     hoverColor: Colors.transparent,
-                    borderRadius:
-                        const BorderRadius.horizontal(left: Radius.circular(12)),
-                    onTap: () => widget.onConvert(null),
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(12)),
+                    onTap: () => widget.onConvert(context, null),
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12),
                       child: Row(
@@ -1025,10 +1451,44 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
     final algorithms = widget.type == _FileTab.image && _options.quality < 100
         ? const ['LZW', 'Zip', 'JPEG', 'WebP', 'RLE']
         : const <String>[];
+    final fields = <Widget>[
+      _SliderSetting(
+        label: widget.strings.compressionRatio,
+        value: _options.quality,
+        onChanged: (value) =>
+            _update(_options.copyWith(quality: value, lossless: value >= 100)),
+      ),
+      if (bitrates.isNotEmpty)
+        _DropdownSetting(
+          label: widget.strings.bitrate,
+          value: _options.bitrate,
+          values: bitrates,
+          strings: widget.strings,
+          onChanged: (value) => _update(_options.copyWith(bitrate: value)),
+        ),
+      if (codecs.isNotEmpty)
+        _DropdownSetting(
+          label: widget.strings.codec,
+          value: _options.codec,
+          values: codecs,
+          strings: widget.strings,
+          onChanged: (value) => _update(_options.copyWith(codec: value)),
+        ),
+      if (algorithms.isNotEmpty)
+        _DropdownSetting(
+          label: widget.strings.compressionAlgorithm,
+          value: _options.compressionAlgorithm,
+          values: algorithms,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(compressionAlgorithm: value)),
+        ),
+    ];
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_themeTokens(context).cardRadius + 4),
+        borderRadius:
+            BorderRadius.circular(_themeTokens(context).cardRadius + 4),
       ),
       title: Text('${widget.strings.formatSettings} - ${widget.format}'),
       content: SizedBox(
@@ -1036,37 +1496,10 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SliderSetting(
-              label: widget.strings.compressionRatio,
-              value: _options.quality,
-              onChanged: (value) => _update(
-                  _options.copyWith(quality: value, lossless: value >= 100)),
-            ),
-            if (bitrates.isNotEmpty)
-              _DropdownSetting(
-                label: widget.strings.bitrate,
-                value: _options.bitrate,
-                values: bitrates,
-                onChanged: (value) =>
-                    _update(_options.copyWith(bitrate: value)),
-              ),
-            if (codecs.isNotEmpty)
-              _DropdownSetting(
-                label: widget.strings.codec,
-                value: _options.codec,
-                values: codecs,
-                onChanged: (value) => _update(_options.copyWith(codec: value)),
-              ),
-            if (algorithms.isNotEmpty)
-              _DropdownSetting(
-                label: widget.strings.compressionAlgorithm,
-                value: _options.compressionAlgorithm,
-                values: algorithms,
-                onChanged: (value) =>
-                    _update(_options.copyWith(compressionAlgorithm: value)),
-              ),
-          ],
+          children: fields
+              .expand((field) => [field, const SizedBox(height: 20)])
+              .take(fields.length * 2 - 1)
+              .toList(),
         ),
       ),
       actions: [
@@ -1212,15 +1645,18 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = _themeTokens(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: result.success ? tokens.surface : const Color(0xFFFFF6F6),
+        color: result.success
+            ? tokens.surface
+            : dark
+                ? const Color(0xFF331E22)
+                : const Color(0xFFFFF6F6),
         borderRadius: BorderRadius.circular(tokens.cardRadius),
         border: Border.all(
-            color: result.success
-                ? tokens.border
-                : const Color(0xFFFFB3B3)),
+            color: result.success ? tokens.border : const Color(0xFFFFB3B3)),
       ),
       child: Row(
         children: [
@@ -1273,11 +1709,9 @@ class _ResultCard extends StatelessWidget {
 }
 
 class _SettingsDialog extends StatefulWidget {
-  final AppStrings strings;
   final SettingsController controller;
 
   const _SettingsDialog({
-    required this.strings,
     required this.controller,
   });
 
@@ -1292,25 +1726,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       TextEditingController(text: _settings.defaultOutputDirectory);
   late final TextEditingController _templateController =
       TextEditingController(text: _settings.namingTemplate);
-  late final TextEditingController _fontController =
-      TextEditingController(text: _settings.fontFamily);
-  late final TextEditingController _leftFontController =
-      TextEditingController(text: _settings.leftPaneFontFamily);
-  late final TextEditingController _rightFontController =
-      TextEditingController(text: _settings.rightPaneFontFamily);
-  late final TextEditingController _settingsFontController =
-      TextEditingController(text: _settings.settingsFontFamily);
   late final TextEditingController _iconPathController =
       TextEditingController(text: _settings.appIconPath);
+  String? _templateError;
+
+  AppStrings get strings => AppStrings(_settings.language);
 
   @override
   void dispose() {
     _directoryController.dispose();
     _templateController.dispose();
-    _fontController.dispose();
-    _leftFontController.dispose();
-    _rightFontController.dispose();
-    _settingsFontController.dispose();
     _iconPathController.dispose();
     super.dispose();
   }
@@ -1319,49 +1744,49 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   Widget build(BuildContext context) {
     final tokens = _themeTokens(context);
     return DefaultTextStyle.merge(
-      style: TextStyle(
-        fontFamily: _settings.settingsFontFamily.isEmpty
-            ? null
-            : _settings.settingsFontFamily,
-      ),
+      style: const TextStyle(fontFamily: 'MiSans'),
       child: Dialog(
         insetPadding: const EdgeInsets.all(24),
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(tokens.cardRadius + 8),
         ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 980, maxHeight: 720),
-          child: Row(
-            children: [
-              Container(
-                width: 180,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: tokens.background,
-                  borderRadius: BorderRadius.horizontal(
-                    left: Radius.circular(tokens.cardRadius + 8),
+        child: ColoredBox(
+          color: tokens.surface,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 980, maxHeight: 720),
+            child: Row(
+              children: [
+                Container(
+                  width: 180,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: tokens.background,
+                    borderRadius: BorderRadius.horizontal(
+                      left: Radius.circular(tokens.cardRadius + 8),
+                    ),
+                  ),
+                  child: Column(
+                    children: _SettingsTab.values.map((tab) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _SideMenuButton(
+                          label: _tabLabel(tab),
+                          selected: _tab == tab,
+                          onTap: () => setState(() => _tab = tab),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
-                child: Column(
-                  children: _SettingsTab.values.map((tab) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _SideMenuButton(
-                        label: _tabLabel(tab),
-                        selected: _tab == tab,
-                        onTap: () => setState(() => _tab = tab),
-                      ),
-                    );
-                  }).toList(),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(22),
+                    child: _buildContent(context),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: _buildContent(context),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1373,17 +1798,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
       _SettingsTab.general => _general(),
       _SettingsTab.preferences => _preferences(),
       _SettingsTab.advanced => _advanced(context),
-      _SettingsTab.custom => _custom(),
       _SettingsTab.about => _about(context),
     };
   }
 
   Widget _general() {
     return _SettingsSection(
-      title: widget.strings.common,
+      title: strings.common,
       children: [
         _TextSetting(
-          label: widget.strings.defaultOutputDirectory,
+          label: strings.defaultOutputDirectory,
           controller: _directoryController,
           action: IconButton(
             icon: const Icon(Icons.folder_open_outlined),
@@ -1399,26 +1823,25 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               _save(_settings.copyWith(defaultOutputDirectory: value)),
         ),
         _SwitchSetting(
-          label: widget.strings.askBeforeConvert,
+          label: strings.askBeforeConvert,
           value: _settings.askBeforeConvert,
           onChanged: (value) =>
               _save(_settings.copyWith(askBeforeConvert: value)),
         ),
-        _TextSetting(
-          label: widget.strings.namingTemplate,
+        _NamingTemplateSetting(
+          strings: strings,
           controller: _templateController,
-          helper: r'Example: $name$_$num$',
-          onSubmitted: (value) =>
-              _save(_settings.copyWith(namingTemplate: value)),
+          errorText: _templateError,
+          onChanged: _saveNamingTemplate,
         ),
         _SwitchSetting(
-          label: widget.strings.overwriteSource,
+          label: strings.overwriteSource,
           value: _settings.overwriteSource,
           onChanged: (value) =>
               _save(_settings.copyWith(overwriteSource: value)),
         ),
         _SwitchSetting(
-          label: widget.strings.gpuAcceleration,
+          label: strings.gpuAcceleration,
           value: _settings.gpuAcceleration,
           onChanged: (value) =>
               _save(_settings.copyWith(gpuAcceleration: value)),
@@ -1429,32 +1852,27 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   Widget _preferences() {
     return _SettingsSection(
-      title: widget.strings.preferences,
+      title: strings.preferences,
       children: [
         _SegmentSetting<AppLanguage>(
-          label: widget.strings.language,
+          label: strings.language,
           values: {
-            AppLanguage.en: widget.strings.languageEnglish,
-            AppLanguage.zh: widget.strings.languageChinese,
+            AppLanguage.en: strings.languageEnglish,
+            AppLanguage.zh: strings.languageChinese,
           },
           selected: _settings.language,
           onChanged: (value) => _save(_settings.copyWith(language: value)),
         ),
         _SegmentSetting<AppThemeChoice>(
-          label: widget.strings.theme,
+          label: strings.theme,
           values: {
-            AppThemeChoice.light: widget.strings.lightTheme,
-            AppThemeChoice.dark: widget.strings.darkTheme,
+            AppThemeChoice.light: strings.lightTheme,
+            AppThemeChoice.dark: strings.darkTheme,
           },
           selected: _settings.theme,
           onChanged: (value) => _save(_settings.copyWith(theme: value)),
         ),
-        _TextSetting(
-          label: widget.strings.font,
-          controller: _fontController,
-          onSubmitted: (value) => _save(_settings.copyWith(fontFamily: value)),
-        ),
-        Text(widget.strings.visibleFormats,
+        Text(strings.visibleFormats,
             style: const TextStyle(fontWeight: FontWeight.w600)),
         _FormatVisibilityGrid(
             settings: _settings, controller: widget.controller),
@@ -1464,15 +1882,15 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   Widget _advanced(BuildContext context) {
     return _SettingsSection(
-      title: widget.strings.advanced,
+      title: strings.advanced,
       children: [
         _SwitchSetting(
-          label: widget.strings.developerMode,
+          label: strings.developerMode,
           value: _settings.developerMode,
           onChanged: (value) async {
             if (value) {
               final confirmed =
-                  await _confirm(context, widget.strings.developerWarning);
+                  await _confirm(context, strings.developerWarning);
               if (!confirmed) return;
             }
             _save(_settings.copyWith(developerMode: value));
@@ -1480,17 +1898,17 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         ),
         if (_settings.developerMode)
           _SettingsSectionCard(
-            title: widget.strings.appearance,
+            title: strings.appearance,
             children: [
               FilledButton.icon(
                 onPressed: () => _editThemeJson(context),
                 icon: const Icon(Icons.palette_outlined, size: 18),
-                label: Text(widget.strings.themeColors),
+                label: Text(strings.themeColors),
               ),
               _TextSetting(
-                label: widget.strings.appIconPath,
+                label: strings.appIconPath,
                 controller: _iconPathController,
-                helper: widget.strings.appIconTip,
+                helper: strings.appIconTip,
                 action: IconButton(
                   icon: const Icon(Icons.image_outlined),
                   onPressed: () async {
@@ -1499,7 +1917,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       allowedExtensions: ['ico'],
                     );
                     final paths = result?.paths.whereType<String>().toList();
-                    final path = paths == null || paths.isEmpty ? null : paths.first;
+                    final path =
+                        paths == null || paths.isEmpty ? null : paths.first;
                     if (path != null) {
                       _iconPathController.text = path;
                       _save(_settings.copyWith(appIconPath: path));
@@ -1509,26 +1928,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 onSubmitted: (value) =>
                     _save(_settings.copyWith(appIconPath: value)),
               ),
-              _TextSetting(
-                label: widget.strings.leftPaneFont,
-                controller: _leftFontController,
-                onSubmitted: (value) =>
-                    _save(_settings.copyWith(leftPaneFontFamily: value)),
-              ),
-              _TextSetting(
-                label: widget.strings.rightPaneFont,
-                controller: _rightFontController,
-                onSubmitted: (value) =>
-                    _save(_settings.copyWith(rightPaneFontFamily: value)),
-              ),
-              _TextSetting(
-                label: widget.strings.settingsFont,
-                controller: _settingsFontController,
-                onSubmitted: (value) =>
-                    _save(_settings.copyWith(settingsFontFamily: value)),
-              ),
               _SliderSetting(
-                label: widget.strings.cardRadius,
+                label: strings.cardRadius,
                 value: _settings.cardRadius.round().clamp(0, 36).toInt(),
                 min: 0,
                 max: 36,
@@ -1542,51 +1943,53 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     );
   }
 
-  Widget _custom() {
-    return _SettingsSection(
-      title: widget.strings.custom,
-      children: [
-        Text(
-          widget.strings.isZh
-              ? '自定义项会在开发者模式中通过主题 JSON 生效。'
-              : 'Custom values are applied through the developer theme JSON.',
-          style: const TextStyle(color: Color(0xFF6E6E73)),
-        ),
-      ],
-    );
-  }
-
   Widget _about(BuildContext context) {
     return _SettingsSection(
-      title: widget.strings.about,
+      title: strings.about,
       children: [
-        Text(widget.strings.aboutBody, style: const TextStyle(height: 1.45)),
-        _SupportLinkRow(strings: widget.strings),
+        Text(strings.aboutBody, style: const TextStyle(height: 1.45)),
+        _SupportLinkRow(
+          strings: strings,
+          serviceLabel: strings.github,
+          url: 'https://github.com/domin1c86/formatConv',
+          icon: _SupportIcon.github,
+        ),
+        _SupportLinkRow(
+          strings: strings,
+          serviceLabel: strings.gitee,
+          url: 'https://gitee.com/domin1c/format-conv',
+          icon: _SupportIcon.gitee,
+        ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
           onPressed: () async {
-            final confirmed =
-                await _confirm(context, widget.strings.resetWarning);
+            final confirmed = await _confirm(context, strings.resetWarning);
             if (confirmed) {
               await widget.controller.resetAll();
               setState(() => _settings = widget.controller.settings);
             }
           },
           icon: const Icon(Icons.restart_alt_rounded),
-          label: Text(widget.strings.reset),
+          label: Text(strings.reset),
         ),
       ],
     );
   }
 
   Future<void> _editThemeJson(BuildContext context) async {
-    final controller =
-        TextEditingController(text: _settings.effectiveThemeJson);
+    final themeJson = _settings.themeJson.isEmpty
+        ? const JsonEncoder.withIndent('  ').convert(
+            _settings.theme == AppThemeChoice.dark
+                ? defaultDarkThemeTokens
+                : defaultLightThemeTokens,
+          )
+        : _settings.effectiveThemeJson;
+    final controller = TextEditingController(text: themeJson);
     final error = await showDialog<String?>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(widget.strings.edit),
+        title: Text(strings.edit),
         content: SizedBox(
           width: 620,
           height: 420,
@@ -1595,21 +1998,23 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             expands: true,
             maxLines: null,
             minLines: null,
-            style: const TextStyle(fontFamily: 'Consolas', fontSize: 13),
+            style: const TextStyle(fontFamily: 'MiSans', fontSize: 13),
             decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(widget.strings.cancel)),
+              child: Text(strings.cancel)),
           FilledButton(
             onPressed: () async {
-              final message =
-                  await widget.controller.saveThemeJson(controller.text);
+              final message = await widget.controller.saveThemeJson(
+                controller.text,
+                strings,
+              );
               if (context.mounted) Navigator.of(context).pop(message);
             },
-            child: Text(widget.strings.save),
+            child: Text(strings.save),
           ),
         ],
       ),
@@ -1623,7 +2028,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'))
+                child: Text(strings.confirm))
           ],
         ),
       );
@@ -1641,10 +2046,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             actions: [
               TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(widget.strings.cancel)),
+                  child: Text(strings.cancel)),
               FilledButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('OK')),
+                  child: Text(strings.confirm)),
             ],
           ),
         ) ??
@@ -1653,11 +2058,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   String _tabLabel(_SettingsTab tab) {
     return switch (tab) {
-      _SettingsTab.general => widget.strings.common,
-      _SettingsTab.preferences => widget.strings.preferences,
-      _SettingsTab.advanced => widget.strings.advanced,
-      _SettingsTab.custom => widget.strings.custom,
-      _SettingsTab.about => widget.strings.about,
+      _SettingsTab.general => strings.common,
+      _SettingsTab.preferences => strings.preferences,
+      _SettingsTab.advanced => strings.advanced,
+      _SettingsTab.about => strings.about,
     };
   }
 
@@ -1665,19 +2069,38 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     setState(() => _settings = settings);
     widget.controller.update(settings);
   }
+
+  void _saveNamingTemplate(String value) {
+    final matches = RegExp(r'\$num').allMatches(value).length;
+    if (matches != 1) {
+      setState(() => _templateError = strings.namingTemplateRule);
+      return;
+    }
+    setState(() => _templateError = null);
+    _save(_settings.copyWith(namingTemplate: value));
+  }
 }
+
+enum _SupportIcon { github, gitee }
 
 class _SupportLinkRow extends StatefulWidget {
   final AppStrings strings;
+  final String serviceLabel;
+  final String url;
+  final _SupportIcon icon;
 
-  const _SupportLinkRow({required this.strings});
+  const _SupportLinkRow({
+    required this.strings,
+    required this.serviceLabel,
+    required this.url,
+    required this.icon,
+  });
 
   @override
   State<_SupportLinkRow> createState() => _SupportLinkRowState();
 }
 
 class _SupportLinkRowState extends State<_SupportLinkRow> {
-  static const _repoUrl = 'https://github.com/domin1c86/formatConv';
   bool _hovering = false;
 
   @override
@@ -1692,6 +2115,8 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
         mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(14),
         hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         onTap: _openRepository,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
@@ -1708,14 +2133,23 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
               Expanded(
                 child: Text(
                   widget.strings.clickSupport,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: tokens.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              CustomPaint(
-                size: const Size(22, 22),
-                painter: _GitHubLogoPainter(
-                  color: _hovering ? tokens.primary : tokens.ink,
+              Text(
+                widget.serviceLabel,
+                style: TextStyle(
+                  color: _hovering ? tokens.primary : tokens.muted,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+              const SizedBox(width: 10),
+              _SupportLogo(
+                icon: widget.icon,
+                color: _hovering ? tokens.primary : tokens.ink,
               ),
             ],
           ),
@@ -1726,8 +2160,43 @@ class _SupportLinkRowState extends State<_SupportLinkRow> {
 
   void _openRepository() {
     if (Platform.isWindows) {
-      Process.run('start', ['', _repoUrl], runInShell: true);
+      Process.run('start', ['', widget.url], runInShell: true);
     }
+  }
+}
+
+class _SupportLogo extends StatelessWidget {
+  final _SupportIcon icon;
+  final Color color;
+
+  const _SupportLogo({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    if (icon == _SupportIcon.github) {
+      return CustomPaint(
+        size: const Size(22, 22),
+        painter: _GitHubLogoPainter(color: color),
+      );
+    }
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border.all(color: color, width: 1.8),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        'G',
+        style: TextStyle(
+          color: color,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+    );
   }
 }
 
@@ -1779,7 +2248,8 @@ class _GitHubLogoPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GitHubLogoPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(_GitHubLogoPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _FormatVisibilityGrid extends StatefulWidget {
@@ -1799,40 +2269,137 @@ class _FormatVisibilityGridState extends State<_FormatVisibilityGrid> {
   late AppSettings _settings = widget.settings;
 
   @override
+  void didUpdateWidget(covariant _FormatVisibilityGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.settings != widget.settings) {
+      _settings = widget.settings;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 14,
-      runSpacing: 14,
+    final strings = AppStrings(_settings.language);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formatColumn(
-            'video', supportedVideoFormats, _settings.visibleVideoFormats),
-        _formatColumn(
-            'audio', supportedAudioFormats, _settings.visibleAudioFormats),
-        _formatColumn(
-            'image', supportedImageFormats, _settings.visibleImageFormats),
+        _formatSection(strings.video, 'video', supportedVideoFormats,
+            _settings.visibleVideoFormats),
+        const SizedBox(height: 14),
+        _formatSection(strings.audio, 'audio', supportedAudioFormats,
+            _settings.visibleAudioFormats),
+        const SizedBox(height: 14),
+        _formatSection(strings.image, 'image', supportedImageFormats,
+            _settings.visibleImageFormats),
       ],
     );
   }
 
-  Widget _formatColumn(
-      String type, List<String> formats, Set<String> selected) {
-    return SizedBox(
-      width: 190,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: formats.map((format) {
-          final active = selected.contains(format);
-          return FilterChip(
-            label: Text(format),
-            selected: active,
-            mouseCursor: SystemMouseCursors.click,
-            onSelected: (enabled) async {
-              await widget.controller.toggleFormat(type, format, enabled);
-              setState(() => _settings = widget.controller.settings);
-            },
-          );
-        }).toList(),
+  Widget _formatSection(
+    String title,
+    String type,
+    List<String> formats,
+    Set<String> selected,
+  ) {
+    final tokens = _themeTokens(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: TextStyle(color: tokens.ink, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: formats.map((format) {
+            final active = selected.contains(format);
+            return _FormatVisibilityCard(
+              label: format,
+              active: active,
+              onTap: () async {
+                await widget.controller.toggleFormat(type, format, !active);
+                setState(() => _settings = widget.controller.settings);
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _FormatVisibilityCard extends StatefulWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _FormatVisibilityCard({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  State<_FormatVisibilityCard> createState() => _FormatVisibilityCardState();
+}
+
+class _FormatVisibilityCardState extends State<_FormatVisibilityCard> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: InkWell(
+        mouseCursor: SystemMouseCursors.click,
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 72,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: widget.active
+                ? tokens.primary.withValues(alpha: 0.16)
+                : _hovering
+                    ? tokens.hover
+                    : tokens.surfaceMuted,
+            borderRadius: BorderRadius.circular(tokens.cardRadius),
+            border: Border.all(
+              color:
+                  widget.active || _hovering ? tokens.primary : tokens.border,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  widget.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: tokens.ink,
+                    fontSize: 12,
+                    fontWeight:
+                        widget.active ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Icon(
+                widget.active ? Icons.check_rounded : Icons.add_rounded,
+                size: 13,
+                color: widget.active ? tokens.primary : tokens.muted,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1878,6 +2445,7 @@ class _TabStrip<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -1889,6 +2457,21 @@ class _TabStrip<T> extends StatelessWidget {
               label: Text(tab.label),
               selected: active,
               mouseCursor: SystemMouseCursors.click,
+              labelStyle: TextStyle(
+                fontFamily: 'MiSans',
+                color: tokens.ink,
+                fontSize: 14,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+              ),
+              selectedColor: tokens.primary.withValues(alpha: 0.16),
+              backgroundColor: tokens.surface,
+              disabledColor: tokens.surfaceMuted,
+              side: BorderSide(
+                color: active ? tokens.primary.withValues(alpha: 0.25) : tokens.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
               onSelected: (_) => onChanged(tab.value),
             ),
           );
@@ -1919,31 +2502,42 @@ class _SideMenuButtonState extends State<_SideMenuButton> {
   @override
   Widget build(BuildContext context) {
     final tokens = _themeTokens(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final hoverFill = dark ? const Color(0xFF34343A) : const Color(0xFFE8E8EC);
+    final hoverBorder =
+        dark ? const Color(0xFF34343A) : const Color(0xFFE8E8EC);
+    final selectedFill =
+        dark ? const Color(0xFF20324A) : const Color(0xFFE3F1FF);
+    final fillColor = widget.selected
+        ? selectedFill
+        : _hovering
+            ? hoverFill
+            : Colors.transparent;
+    final borderColor = widget.selected
+        ? tokens.primary
+        : _hovering
+            ? hoverBorder
+            : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        borderRadius: BorderRadius.circular(12),
-        hoverColor: Colors.transparent,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+        child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
-            color: widget.selected
-                ? tokens.surface
-                : _hovering
-                    ? tokens.hover
-                    : Colors.transparent,
+            color: fillColor,
             borderRadius: BorderRadius.circular(tokens.cardRadius),
+            border: Border.all(color: borderColor),
           ),
           child: Text(widget.label,
-            style: TextStyle(
-                fontWeight:
-                    widget.selected ? FontWeight.w600 : FontWeight.w400)),
+              style: TextStyle(
+                  color: tokens.ink,
+                  fontWeight:
+                      widget.selected ? FontWeight.w600 : FontWeight.w400)),
         ),
       ),
     );
@@ -1964,7 +2558,11 @@ class _SettingsSection extends StatelessWidget {
     return ListView(
       children: [
         Text(title,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+            style: TextStyle(
+              color: _themeTokens(context).ink,
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+            )),
         const SizedBox(height: 20),
         ...children.expand((child) => [child, const SizedBox(height: 14)]),
       ],
@@ -1995,11 +2593,76 @@ class _SettingsSectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: TextStyle(color: tokens.ink, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 12),
           ...children.expand((child) => [child, const SizedBox(height: 12)]),
         ],
       ),
+    );
+  }
+}
+
+class _NamingTemplateSetting extends StatelessWidget {
+  final AppStrings strings;
+  final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String> onChanged;
+
+  const _NamingTemplateSetting({
+    required this.strings,
+    required this.controller,
+    required this.errorText,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          strings.namingTemplate,
+          style: TextStyle(color: tokens.ink, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              strings.namingTemplatePrefix,
+              style: TextStyle(
+                color: tokens.ink,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: TextField(
+                controller: controller,
+                onChanged: onChanged,
+                onSubmitted: onChanged,
+                decoration: InputDecoration(
+                  isDense: true,
+                  errorText: errorText,
+                  helperText: strings.namingTemplateRule,
+                ),
+              ),
+            ),
+            Text(
+              strings.namingTemplateSuffix,
+              style: TextStyle(
+                color: tokens.ink,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -2072,6 +2735,7 @@ class _SegmentSetting<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return Row(
       children: [
         SizedBox(width: 110, child: Text(label)),
@@ -2081,6 +2745,27 @@ class _SegmentSetting<T> extends StatelessWidget {
                   ButtonSegment<T>(value: entry.key, label: Text(entry.value)))
               .toList(),
           selected: {selected},
+          style: ButtonStyle(
+            mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+            foregroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) return tokens.primary;
+              return tokens.ink;
+            }),
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return tokens.primary.withValues(alpha: 0.16);
+              }
+              if (states.contains(WidgetState.hovered)) return tokens.hover;
+              return tokens.surfaceMuted;
+            }),
+            side: WidgetStateProperty.resolveWith((states) {
+              return BorderSide(
+                color: states.contains(WidgetState.selected)
+                    ? tokens.primary
+                    : tokens.border,
+              );
+            }),
+          ),
           onSelectionChanged: (selection) => onChanged(selection.first),
         ),
       ],
@@ -2133,25 +2818,51 @@ class _DropdownSetting extends StatelessWidget {
   final String label;
   final String? value;
   final List<String> values;
+  final AppStrings strings;
   final ValueChanged<String?> onChanged;
 
   const _DropdownSetting({
     required this.label,
     required this.value,
     required this.values,
+    required this.strings,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return DropdownButtonFormField<String>(
       initialValue: value != null && values.contains(value) ? value : null,
+      isDense: true,
+      menuMaxHeight: 240,
+      dropdownColor: tokens.surfaceMuted,
+      borderRadius: BorderRadius.circular(tokens.cardRadius),
+      style: TextStyle(color: tokens.ink, fontSize: 13),
+      iconEnabledColor: tokens.ink,
       decoration: InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: tokens.surfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+          borderSide: BorderSide(color: tokens.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+          borderSide: BorderSide(color: tokens.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+          borderSide: BorderSide(color: tokens.primary),
+        ),
       ),
       items: [
-        const DropdownMenuItem<String>(value: null, child: Text('Default')),
+        DropdownMenuItem<String>(
+          value: null,
+          child: Text(strings.defaultOption),
+        ),
         ...values
             .map((value) => DropdownMenuItem(value: value, child: Text(value))),
       ],
@@ -2168,17 +2879,17 @@ class _ResultField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
     return SizedBox(
       width: 180,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF6E6E73))),
+          Text(label, style: TextStyle(fontSize: 11, color: tokens.muted)),
           const SizedBox(height: 2),
           Text(value,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+              style: TextStyle(color: tokens.ink, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -2192,10 +2903,11 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4F4),
+        color: dark ? const Color(0xFF331E22) : const Color(0xFFFFF4F4),
         borderRadius: BorderRadius.circular(_themeTokens(context).cardRadius),
         border: Border.all(color: const Color(0xFFFFB3B3)),
       ),
@@ -2205,8 +2917,12 @@ class _ErrorBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
               child: Text(message,
-                  style:
-                      const TextStyle(color: Color(0xFF8A0017), fontSize: 13))),
+                  style: TextStyle(
+                    color: dark
+                        ? const Color(0xFFFFC7C7)
+                        : const Color(0xFF8A0017),
+                    fontSize: 13,
+                  ))),
         ],
       ),
     );
@@ -2223,6 +2939,116 @@ _FileTab _fileType(String file) {
 
 bool _matchesTab(String file, _FileTab tab) {
   return tab == _FileTab.all || _fileType(file) == tab;
+}
+
+Color _typeColor(_FileTab type) {
+  return switch (type) {
+    _FileTab.video => const Color(0xFF764DF0),
+    _FileTab.audio => const Color(0xFFF0C74D),
+    _FileTab.image => const Color(0xFFFC7E7E),
+    _FileTab.all => const Color(0xFF9CA3AF),
+  };
+}
+
+bool _isGifFile(String file) => p.extension(file).toLowerCase() == '.gif';
+
+bool _isCompatibleWithTarget(_FileTab targetType, String format, String file) {
+  final sourceType = _fileType(file);
+  final targetFormat = format.toUpperCase();
+  if (targetType == _FileTab.video && _isGifFile(file)) return true;
+  if (targetType == _FileTab.image &&
+      targetFormat == 'GIF' &&
+      sourceType == _FileTab.video) {
+    return true;
+  }
+  return sourceType == targetType;
+}
+
+List<String> _compatibleFiles(
+  _FileTab targetType,
+  String format,
+  List<String> files,
+) {
+  return files
+      .where((file) => _isCompatibleWithTarget(targetType, format, file))
+      .toList();
+}
+
+String _resolveFfmpegExecutable() {
+  final exeToolPath =
+      p.join(p.dirname(Platform.resolvedExecutable), 'tools', 'ffmpeg.exe');
+  if (File(exeToolPath).existsSync()) return exeToolPath;
+
+  final cwdToolPath = p.join(Directory.current.path, 'tools', 'ffmpeg.exe');
+  if (File(cwdToolPath).existsSync()) return cwdToolPath;
+
+  return 'ffmpeg';
+}
+
+void _showTopNotice(BuildContext context, String message) {
+  final overlay = Overlay.maybeOf(context);
+  if (overlay == null) return;
+
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (context) {
+      final tokens = _themeTokens(context);
+      return Positioned(
+        top: 24,
+        left: 24,
+        right: 24,
+        child: Material(
+          color: Colors.transparent,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: tokens.surface,
+                  borderRadius: BorderRadius.circular(tokens.cardRadius),
+                  border: Border.all(color: const Color(0xFFE5484D)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.block_rounded,
+                        color: Color(0xFFE5484D), size: 20),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        message,
+                        style: TextStyle(color: tokens.ink, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  overlay.insert(entry);
+  Future.delayed(const Duration(seconds: 4), () {
+    if (entry.mounted) entry.remove();
+  });
+}
+
+void _openPath(String path) {
+  if (Platform.isWindows) {
+    Process.run('start', ['', path], runInShell: true);
+  }
 }
 
 List<String> _codecsFor(String format, _FileTab type) {

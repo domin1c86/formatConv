@@ -15,6 +15,40 @@ final conversionProvider = ChangeNotifierProvider<ConversionProvider>((ref) {
   return ConversionProvider();
 });
 
+class ConversionTask {
+  final String inputPath;
+  final String outputPath;
+  final double progress;
+  final DateTime startedAt;
+  final bool completed;
+  final bool failed;
+
+  const ConversionTask({
+    required this.inputPath,
+    required this.outputPath,
+    required this.progress,
+    required this.startedAt,
+    this.completed = false,
+    this.failed = false,
+  });
+
+  ConversionTask copyWith({
+    String? outputPath,
+    double? progress,
+    bool? completed,
+    bool? failed,
+  }) {
+    return ConversionTask(
+      inputPath: inputPath,
+      outputPath: outputPath ?? this.outputPath,
+      progress: progress ?? this.progress,
+      startedAt: startedAt,
+      completed: completed ?? this.completed,
+      failed: failed ?? this.failed,
+    );
+  }
+}
+
 class ConversionProvider extends ChangeNotifier {
   final ConversionService _service = ConversionService();
 
@@ -25,6 +59,8 @@ class ConversionProvider extends ChangeNotifier {
   ConversionStatus? _currentStatus;
   String? _error;
   final Map<String, ConversionResult> _results = {};
+  final Set<String> _processedFiles = {};
+  final Map<String, ConversionTask> _conversionTasks = {};
 
   List<String> get selectedFiles => _selectedFiles;
   String? get selectedFormat => _selectedFormat;
@@ -33,6 +69,8 @@ class ConversionProvider extends ChangeNotifier {
   ConversionStatus? get currentStatus => _currentStatus;
   String? get error => _error;
   Map<String, ConversionResult> get results => _results;
+  Set<String> get processedFiles => Set.unmodifiable(_processedFiles);
+  List<ConversionTask> get conversionTasks => _conversionTasks.values.toList();
 
   static final Set<String> supportedFormats =
       formatDescriptions.keys.map((k) => k.toUpperCase()).toSet();
@@ -45,6 +83,8 @@ class ConversionProvider extends ChangeNotifier {
     final normalized = files.where((file) => file.trim().isNotEmpty).toList();
     if (replace) {
       _selectedFiles = [];
+      _processedFiles.clear();
+      _conversionTasks.clear();
     }
     _selectedFiles = [
       ..._selectedFiles,
@@ -215,6 +255,13 @@ class ConversionProvider extends ChangeNotifier {
           options.overwrite || (settings?.overwriteSource ?? false),
           settings,
         );
+        _conversionTasks[file] = ConversionTask(
+          inputPath: file,
+          outputPath: outputPath,
+          progress: 0,
+          startedAt: startedAt,
+        );
+        notifyListeners();
 
         if (!_checkOutputWritable(outputPath)) {
           final result = ConversionResult(
@@ -226,6 +273,11 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'permission_write'),
           );
           _results[file] = result;
+          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+            completed: true,
+            failed: true,
+          );
+          notifyListeners();
           onResult?.call(result);
           continue;
         }
@@ -241,6 +293,11 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'no_space'),
           );
           _results[file] = result;
+          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+            completed: true,
+            failed: true,
+          );
+          notifyListeners();
           onResult?.call(result);
           continue;
         }
@@ -252,6 +309,9 @@ class ConversionProvider extends ChangeNotifier {
             options,
             (id, progress, processed, total, status, error) {
               _progress = progress;
+              _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+                progress: progress.clamp(0.0, 1.0).toDouble(),
+              );
               notifyListeners();
             },
           );
@@ -265,6 +325,9 @@ class ConversionProvider extends ChangeNotifier {
               if (conversionStatus != null) {
                 _currentStatus = conversionStatus;
                 _progress = conversionStatus.progress;
+                _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+                  progress: conversionStatus.progress.clamp(0.0, 1.0).toDouble(),
+                );
                 notifyListeners();
               }
             } while (conversionStatus != null &&
@@ -280,6 +343,16 @@ class ConversionProvider extends ChangeNotifier {
               error: failed ? _mapBackendError(conversionStatus?.error) : null,
             );
             _results[file] = result;
+            if (result.success) {
+              _processedFiles.add(file);
+            }
+            _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+              outputPath: outputPath,
+              progress: result.success ? 1 : _progress,
+              completed: true,
+              failed: !result.success,
+            );
+            notifyListeners();
             onResult?.call(result);
           } finally {
             ConversionService.disposeProgressCallback(conversionId);
@@ -294,6 +367,11 @@ class ConversionProvider extends ChangeNotifier {
             error: _mapBackendError(e.toString()),
           );
           _results[file] = result;
+          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+            completed: true,
+            failed: true,
+          );
+          notifyListeners();
           onResult?.call(result);
         }
       }
@@ -349,11 +427,11 @@ class ConversionProvider extends ChangeNotifier {
     final baseName = p.basenameWithoutExtension(inputPath);
     final ext = format.toLowerCase();
     final template = _normalizedNamingTemplate(settings?.namingTemplate);
-    var outputPath = p.join(dir, '${_applyNamingTemplate(template, baseName, 1)}.$ext');
+    var outputPath = p.join(dir, '$baseName.$ext');
 
     if (overwrite) return outputPath;
 
-    int suffix = 2;
+    int suffix = 1;
     while (File(outputPath).existsSync()) {
       outputPath = p.join(
         dir,
@@ -365,15 +443,13 @@ class ConversionProvider extends ChangeNotifier {
   }
 
   String _normalizedNamingTemplate(String? template) {
-    final trimmed = template?.trim() ?? '';
-    if (trimmed.isEmpty) return r'$name$_1';
-    return trimmed.contains(r'$name$') ? trimmed : r'$name$_$num$';
+    final trimmed = (template ?? '').replaceAll(r'$name$', '').trim();
+    final matches = RegExp(r'\$num').allMatches(trimmed).length;
+    return matches == 1 ? trimmed : r'_$num';
   }
 
   String _applyNamingTemplate(String template, String baseName, int number) {
-    final result = template
-        .replaceAll(r'$name$', baseName)
-        .replaceAll(r'$num$', '$number');
-    return result.trim().isEmpty ? '${baseName}_$number' : result;
+    final suffix = template.replaceAll(r'$num', '$number');
+    return '$baseName$suffix';
   }
 }

@@ -35,7 +35,7 @@ void main() {
 
     expect(
       find.text(
-        'Add files, then choose a target format or drag a file onto one.',
+        'Add files, then choose a target format or drag files onto a compatible format.',
         skipOffstage: false,
       ),
       findsOneWidget,

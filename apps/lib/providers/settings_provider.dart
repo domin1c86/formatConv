@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../models/conversion_result.dart';
 
@@ -79,11 +80,13 @@ class SettingsController extends ChangeNotifier {
     }
   }
 
-  Future<String?> saveThemeJson(String source) async {
+  Future<String?> saveThemeJson(String source, AppStrings strings) async {
     try {
       final decoded = jsonDecode(source);
       if (decoded is! Map<String, dynamic>) {
-        return 'Theme JSON must be an object.';
+        return strings.isZh
+            ? '主题 JSON 必须是一个对象。'
+            : 'Theme JSON must be an object.';
       }
       await update(_settings.copyWith(
         themeJson: const JsonEncoder.withIndent('  ').convert(decoded),
@@ -91,7 +94,7 @@ class SettingsController extends ChangeNotifier {
       ));
       return null;
     } catch (e) {
-      return 'Invalid JSON: $e';
+      return strings.isZh ? 'JSON 无效：$e' : 'Invalid JSON: $e';
     }
   }
 

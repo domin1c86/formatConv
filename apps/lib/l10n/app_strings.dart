@@ -24,6 +24,8 @@ class AppStrings {
   String get browseFiles => isZh ? '选择文件' : 'Browse';
   String selectedCount(int count) =>
       isZh ? '已添加 $count 个文件' : '$count files added';
+  String selectedCardCount(int count) =>
+      isZh ? '已选择 $count 个文件' : '$count files selected';
   String get noFiles => isZh ? '还没有添加文件' : 'No files added';
   String get all => isZh ? '全部' : 'All';
   String get video => isZh ? '视频' : 'Video';
@@ -36,8 +38,8 @@ class AppStrings {
   String get historyHintBody =>
       isZh ? '点击查看历史转换记录' : 'Click to view conversion history';
   String get emptyFormatHint => isZh
-      ? '添加文件后选择目标格式，或将文件拖到格式上转换'
-      : 'Add files, then choose a target format or drag a file onto one.';
+      ? '添加文件后选择目标格式，或将文件拖到对应格式上转换'
+      : 'Add files, then choose a target format or drag files onto a compatible format.';
   String get unsupportedFileType =>
       isZh ? '未检测到可转换的文件类型' : 'No supported file types detected';
   String get videoFormats => isZh ? '视频' : 'Video';
@@ -51,17 +53,23 @@ class AppStrings {
   String get conversionFailed => isZh ? '转换失败' : 'Conversion failed';
   String get converting => isZh ? '正在转换...' : 'Converting...';
   String get cancel => isZh ? '取消' : 'Cancel';
+  String get confirm => isZh ? '确定' : 'OK';
   String get common => isZh ? '常规' : 'General';
   String get preferences => isZh ? '偏好' : 'Preferences';
   String get advanced => isZh ? '高级' : 'Advanced';
-  String get custom => isZh ? '自定义' : 'Custom';
   String get about => isZh ? '关于' : 'About';
   String get clickSupport => isZh ? '点击支持' : 'Support';
+  String get github => 'GitHub';
+  String get gitee => 'Gitee';
   String get defaultOutputDirectory =>
       isZh ? '默认输出目录' : 'Default output directory';
   String get askBeforeConvert =>
       isZh ? '每次转换前询问保存地址' : 'Ask before each conversion';
   String get namingTemplate => isZh ? '转换后命名' : 'Output naming';
+  String get namingTemplatePrefix => 'name[';
+  String get namingTemplateSuffix => ']';
+  String get namingTemplateRule =>
+      isZh ? r'仅能有一个 $num' : r'Only contain $num once';
   String get overwriteSource => isZh ? '是否覆盖源文件' : 'Overwrite source file';
   String get gpuAcceleration => isZh ? '启用 GPU 加速' : 'Enable GPU acceleration';
   String get language => isZh ? '语言' : 'Language';
@@ -75,7 +83,8 @@ class AppStrings {
   String get rightPaneFont => isZh ? '右侧区域字体' : 'Right pane font';
   String get settingsFont => isZh ? '设置弹窗字体' : 'Settings dialog font';
   String get cardRadius => isZh ? '卡片圆角' : 'Card radius';
-  String get appIconPath => isZh ? '开发/打包图标路径' : 'Development/package icon path';
+  String get appIconPath =>
+      isZh ? '开发/打包图标路径' : 'Development/package icon path';
   String get appIconTip => isZh
       ? '选择 .ico 文件后保存路径；已构建 exe 的图标仍需要替换项目 app_icon.ico 并重新构建。'
       : 'Choose an .ico file path. Built exe icons still require replacing app_icon.ico and rebuilding.';
@@ -99,6 +108,15 @@ class AppStrings {
   String get codec => isZh ? '编码格式' : 'Codec';
   String get compressionAlgorithm => isZh ? '压缩算法' : 'Compression algorithm';
   String get formatSettings => isZh ? '格式设置' : 'Format settings';
+  String get defaultOption => isZh ? '默认' : 'Default';
+  String get typeMismatchTitle =>
+      isZh ? '部分文件类型不匹配' : 'Some files were skipped';
+  String typeMismatchMessage(List<String> names) {
+    final joined = names.join(isZh ? '、' : ', ');
+    return isZh
+        ? '以下文件不适合当前目标格式，已跳过：$joined'
+        : 'These files are not compatible with the target format and were skipped: $joined';
+  }
 
   // Compatibility labels used by older tests/widgets during refactors.
   String get selectFiles => addFiles;

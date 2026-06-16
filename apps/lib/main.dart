@@ -39,19 +39,23 @@ class FormatConvApp extends ConsumerWidget {
 
   ThemeData _buildTheme(AppSettings settings) {
     final tokens = _themeTokens(settings);
-    final actionBlue = _readColor(tokens, 'primary', const Color(0xFF0066CC));
-    final ink = _readColor(tokens, 'ink', const Color(0xFF1D1D1F));
-    final background = settings.theme == AppThemeChoice.dark
-        ? const Color(0xFF111113)
-        : _readColor(tokens, 'background', const Color(0xFFF5F5F7));
-    final surface = settings.theme == AppThemeChoice.dark
-        ? const Color(0xFF1E1E21)
-        : _readColor(tokens, 'surface', Colors.white);
-    final border = _readColor(tokens, 'border', const Color(0xFFE0E0E0));
-    final surfaceMuted =
-        _readColor(tokens, 'surfaceMuted', const Color(0xFFFAFAFC));
-    final hover = _readColor(tokens, 'hover', const Color(0xFFF0F7FF));
-    final muted = _readColor(tokens, 'muted', const Color(0xFF6E6E73));
+    final dark = settings.theme == AppThemeChoice.dark;
+    final actionBlue = _readColor(tokens, 'primary',
+        dark ? const Color(0xFF66A8FF) : const Color(0xFF0066CC));
+    final ink = _readColor(tokens, 'ink',
+        dark ? const Color(0xFFF4F4F5) : const Color(0xFF1D1D1F));
+    final background = _readColor(tokens, 'background',
+        dark ? const Color(0xFF111113) : const Color(0xFFF5F5F7));
+    final surface = _readColor(
+        tokens, 'surface', dark ? const Color(0xFF1E1E21) : Colors.white);
+    final border = _readColor(tokens, 'border',
+        dark ? const Color(0xFF3A3A40) : const Color(0xFFE0E0E0));
+    final surfaceMuted = _readColor(tokens, 'surfaceMuted',
+        dark ? const Color(0xFF29292D) : const Color(0xFFFAFAFC));
+    final hover = _readColor(tokens, 'hover',
+        dark ? const Color(0xFF263142) : const Color(0xFFF0F7FF));
+    final muted = _readColor(tokens, 'muted',
+        dark ? const Color(0xFFA8A8AE) : const Color(0xFF6E6E73));
     final radius = settings.cardRadius > 0
         ? settings.cardRadius
         : (tokens['cardRadius'] as num?)?.toDouble() ?? 14;
@@ -64,12 +68,10 @@ class FormatConvApp extends ConsumerWidget {
         seedColor: actionBlue,
         primary: actionBlue,
         surface: surface,
-        brightness: settings.theme == AppThemeChoice.dark
-            ? Brightness.dark
-            : Brightness.light,
+        brightness: dark ? Brightness.dark : Brightness.light,
       ),
       scaffoldBackgroundColor: background,
-      fontFamily: settings.fontFamily.isEmpty ? 'MiSans' : settings.fontFamily,
+      fontFamily: 'MiSans',
       useMaterial3: true,
     );
 
@@ -77,8 +79,7 @@ class FormatConvApp extends ConsumerWidget {
       textTheme: base.textTheme.apply(
         bodyColor: ink,
         displayColor: ink,
-        fontFamily:
-            settings.fontFamily.isEmpty ? 'MiSans' : settings.fontFamily,
+        fontFamily: 'MiSans',
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.black,
@@ -160,7 +161,7 @@ class FormatConvApp extends ConsumerWidget {
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return actionBlue;
-          return Colors.white;
+          return surfaceMuted;
         }),
         side: BorderSide(color: border),
       ),
@@ -170,12 +171,72 @@ class FormatConvApp extends ConsumerWidget {
         overlayColor: const Color(0x220066CC),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radius),
           side: BorderSide(color: border),
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: surfaceMuted,
+        selectedColor: actionBlue.withValues(alpha: 0.16),
+        disabledColor: surfaceMuted.withValues(alpha: 0.55),
+        labelStyle: TextStyle(color: ink),
+        secondaryLabelStyle: TextStyle(color: ink),
+        side: BorderSide(color: border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceMuted,
+        labelStyle: TextStyle(color: muted),
+        helperStyle: TextStyle(color: muted),
+        floatingLabelStyle: TextStyle(color: actionBlue),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: actionBlue, width: 1.4),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          color: ink,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'MiSans',
+        ),
+        contentTextStyle: TextStyle(
+          color: ink,
+          fontSize: 14,
+          fontFamily: 'MiSans',
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: TextStyle(color: ink),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: surfaceMuted,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(radius),
+            borderSide: BorderSide(color: border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(radius),
+            borderSide: BorderSide(color: actionBlue),
+          ),
         ),
       ),
       extensions: [
@@ -195,6 +256,11 @@ class FormatConvApp extends ConsumerWidget {
   }
 
   Map<String, dynamic> _themeTokens(AppSettings settings) {
+    if (settings.themeJson.isEmpty) {
+      return settings.theme == AppThemeChoice.dark
+          ? defaultDarkThemeTokens
+          : defaultLightThemeTokens;
+    }
     try {
       final decoded = jsonDecode(settings.effectiveThemeJson);
       if (decoded is Map<String, dynamic>) return decoded;

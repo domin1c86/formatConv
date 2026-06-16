@@ -60,7 +60,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     return AppThemeTokens(
       background: Color.lerp(background, other.background, t) ?? background,
       surface: Color.lerp(surface, other.surface, t) ?? surface,
-      surfaceMuted: Color.lerp(surfaceMuted, other.surfaceMuted, t) ?? surfaceMuted,
+      surfaceMuted:
+          Color.lerp(surfaceMuted, other.surfaceMuted, t) ?? surfaceMuted,
       hover: Color.lerp(hover, other.hover, t) ?? hover,
       ink: Color.lerp(ink, other.ink, t) ?? ink,
       muted: Color.lerp(muted, other.muted, t) ?? muted,
@@ -103,7 +104,9 @@ const supportedAudioFormats = [
   'OPUS'
 ];
 
-const Map<String, dynamic> defaultThemeTokens = {
+const Map<String, dynamic> defaultThemeTokens = defaultLightThemeTokens;
+
+const Map<String, dynamic> defaultLightThemeTokens = {
   'background': '#F5F5F7',
   'surface': '#FFFFFF',
   'surfaceMuted': '#FAFAFC',
@@ -112,6 +115,18 @@ const Map<String, dynamic> defaultThemeTokens = {
   'muted': '#6E6E73',
   'primary': '#0066CC',
   'border': '#E0E0E0',
+  'cardRadius': 14,
+};
+
+const Map<String, dynamic> defaultDarkThemeTokens = {
+  'background': '#111113',
+  'surface': '#1E1E21',
+  'surfaceMuted': '#29292D',
+  'hover': '#263142',
+  'ink': '#F4F4F5',
+  'muted': '#A8A8AE',
+  'primary': '#66A8FF',
+  'border': '#3A3A40',
   'cardRadius': 14,
 };
 
@@ -141,7 +156,7 @@ class AppSettings {
     this.fontFamily = 'MiSans',
     this.defaultOutputDirectory = '',
     this.askBeforeConvert = false,
-    this.namingTemplate = r'$name$_1',
+    this.namingTemplate = r'_$num',
     this.overwriteSource = false,
     this.gpuAcceleration = false,
     this.leftPaneFontFamily = '',
@@ -245,7 +260,7 @@ class AppSettings {
       fontFamily: json['fontFamily'] as String? ?? 'MiSans',
       defaultOutputDirectory: json['defaultOutputDirectory'] as String? ?? '',
       askBeforeConvert: json['askBeforeConvert'] as bool? ?? false,
-      namingTemplate: json['namingTemplate'] as String? ?? r'$name$_1',
+      namingTemplate: _readNamingTemplate(json['namingTemplate'] as String?),
       overwriteSource: json['overwriteSource'] as bool? ?? false,
       gpuAcceleration: json['gpuAcceleration'] as bool? ?? false,
       leftPaneFontFamily: json['leftPaneFontFamily'] as String? ?? '',
@@ -263,4 +278,10 @@ class AppSettings {
       themeJson: json['themeJson'] as String? ?? '',
     );
   }
+}
+
+String _readNamingTemplate(String? raw) {
+  final value = raw?.trim() ?? '';
+  if (value.isEmpty) return r'_$num';
+  return value.replaceAll(r'$name$', '');
 }

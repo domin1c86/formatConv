@@ -57,8 +57,10 @@ class FormatCard extends StatelessWidget {
               children: [
                 InkWell(
                   mouseCursor: SystemMouseCursors.click,
-                  hoverColor:
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                  hoverColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                   onTap: onTap,
                   child: Padding(
