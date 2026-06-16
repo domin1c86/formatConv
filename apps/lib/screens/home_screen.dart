@@ -2058,6 +2058,10 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               strings.imageMagickThirdPartyNotice,
               style: TextStyle(color: _themeTokens(context).ink, height: 1.45),
             ),
+            Text(
+              strings.miSansThirdPartyNotice,
+              style: TextStyle(color: _themeTokens(context).ink, height: 1.45),
+            ),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton.icon(

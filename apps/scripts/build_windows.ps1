@@ -149,6 +149,10 @@ function Copy-LicenseFiles {
   Copy-Item -LiteralPath (Join-Path $LicenseSourceDir "MiSans-NOTICE.txt") -Destination (Join-Path $releaseLicenseDir "MiSans-NOTICE.txt") -Force
   Copy-Item -LiteralPath $ThirdPartyNoticesPath -Destination (Join-Path $releaseLicenseDir "THIRD_PARTY_NOTICES.txt") -Force
 
+  Copy-IfExists `
+    -Source (Join-Path $LicenseSourceDir "MiSans-License-Agreement.pdf") `
+    -Destination (Join-Path $releaseLicenseDir "MiSans-License-Agreement.pdf") | Out-Null
+
   $imageMagickLicenseCopied = Copy-IfExists `
     -Source (Join-Path $ImageMagickCacheDir "LICENSE.txt") `
     -Destination (Join-Path $releaseLicenseDir "ImageMagick-LICENSE.txt")

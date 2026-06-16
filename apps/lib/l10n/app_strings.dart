@@ -110,6 +110,9 @@ class AppStrings {
   String get imageMagickThirdPartyNotice => isZh
       ? '本软件使用 ImageMagick。ImageMagick 由 ImageMagick Studio LLC 单独授权。'
       : 'This software uses ImageMagick, licensed separately by ImageMagick Studio LLC.';
+  String get miSansThirdPartyNotice => isZh
+      ? '本软件使用 MiSans 字体。MiSans 由小米科技有限责任公司单独授权。'
+      : 'This software uses MiSans fonts, licensed separately by Xiaomi Inc.';
   String get openThirdPartyNotices =>
       isZh ? '打开第三方声明' : 'Open third-party notices';
   String get compressionRatio => isZh ? '压缩率' : 'Compression';
