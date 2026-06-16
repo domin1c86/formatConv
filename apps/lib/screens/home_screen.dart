@@ -1178,7 +1178,8 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
     return MouseRegion(
       cursor: canOpen ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: InkWell(
-        mouseCursor: canOpen ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        mouseCursor:
+            canOpen ? SystemMouseCursors.click : SystemMouseCursors.basic,
         hoverColor: Colors.transparent,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
@@ -1284,9 +1285,8 @@ class _TaskPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = _themeTokens(context);
-    final previewPath = showOutputPreview && outputPath.isNotEmpty
-        ? outputPath
-        : inputPath;
+    final previewPath =
+        showOutputPreview && outputPath.isNotEmpty ? outputPath : inputPath;
     final type = _fileType(previewPath);
     final fallback = Icon(
       type == _FileTab.audio
@@ -2587,7 +2587,9 @@ class _TabStrip<T> extends StatelessWidget {
               backgroundColor: tokens.surface,
               disabledColor: tokens.surfaceMuted,
               side: BorderSide(
-                color: active ? tokens.primary.withValues(alpha: 0.25) : tokens.border,
+                color: active
+                    ? tokens.primary.withValues(alpha: 0.25)
+                    : tokens.border,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),

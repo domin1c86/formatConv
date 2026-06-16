@@ -120,8 +120,7 @@ const Map<String, FormatDescription> formatDescriptions = {
   ),
   'JPG': FormatDescription(
     name: 'JPG',
-    description:
-        'Common JPEG file extension for photographs and web images.',
+    description: 'Common JPEG file extension for photographs and web images.',
     features: [
       'Lossy compression',
       'Small file size',

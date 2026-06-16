@@ -103,8 +103,7 @@ class AppStrings {
   String get aboutBody => isZh
       ? 'FormatConv 是面向 Windows 的本地格式转换工具，支持视频、音频与图片的批量转换。'
       : 'FormatConv is a local Windows conversion tool for video, audio, and image batches.';
-  String get thirdPartyLicenses =>
-      isZh ? '第三方组件与许可证' : 'Third-party licenses';
+  String get thirdPartyLicenses => isZh ? '第三方组件与许可证' : 'Third-party licenses';
   String get ffmpegThirdPartyNotice => isZh
       ? '本软件使用 FFmpeg 项目的 FFmpeg。随包提供的 gyan.dev 构建版本按 GPLv3 授权。'
       : 'This software uses FFmpeg from the FFmpeg project. The bundled gyan.dev build is licensed under GPLv3.';
