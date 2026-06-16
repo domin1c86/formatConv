@@ -1,0 +1,63 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  TOOL_BUNDLE_URL: https://github.com/domin1c86/formatConv/releases/download/v-tools-v0.1.0/formatconv-tools-windows-x64-v0.1.0.7z
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.2"
+          channel: stable
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
+
+      - name: Prepare external tools
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path third_party\tools\windows | Out-Null
+          Invoke-WebRequest $env:TOOL_BUNDLE_URL -OutFile tools.7z
+          7z x tools.7z -othird_party\tools\windows
+
+      - name: Build Windows release
+        shell: powershell
+        run: |
+          cd apps
+          .\scripts\build_windows.ps1 -Mode release
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $env:APP_VERSION = $version
+          $env:FORMATCONV_RELEASE_DIR = "$pwd\apps\build\windows\x64\runner\Release"
+          $env:FORMATCONV_DIST_DIR = "$pwd\dist"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\formatconv.iss
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist\*.exe
+            THIRD_PARTY_NOTICES.md
+            RELEASE_CHECKLIST.md
