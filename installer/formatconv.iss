@@ -14,12 +14,12 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#DistDir}
 OutputBaseFilename=FormatConv_Setup_{#MyAppVersion}_x64
-SetupIconFile=apps\windows\runner\resources\app_icon.ico
+SetupIconFile=D:\Coding\formatConv\apps\windows\runner\resources\app_icon.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
