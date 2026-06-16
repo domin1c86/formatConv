@@ -255,7 +255,9 @@ class ConversionProvider extends ChangeNotifier {
           options.overwrite || (settings?.overwriteSource ?? false),
           settings,
         );
-        _conversionTasks[file] = ConversionTask(
+        final taskKey =
+            '${startedAt.microsecondsSinceEpoch}_${file.hashCode}_${outputPath.hashCode}';
+        _conversionTasks[taskKey] = ConversionTask(
           inputPath: file,
           outputPath: outputPath,
           progress: 0,
@@ -273,7 +275,7 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'permission_write'),
           );
           _results[file] = result;
-          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
             completed: true,
             failed: true,
           );
@@ -293,7 +295,7 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'no_space'),
           );
           _results[file] = result;
-          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
             completed: true,
             failed: true,
           );
@@ -309,7 +311,7 @@ class ConversionProvider extends ChangeNotifier {
             options,
             (id, progress, processed, total, status, error) {
               _progress = progress;
-              _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+              _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
                 progress: progress.clamp(0.0, 1.0).toDouble(),
               );
               notifyListeners();
@@ -325,8 +327,9 @@ class ConversionProvider extends ChangeNotifier {
               if (conversionStatus != null) {
                 _currentStatus = conversionStatus;
                 _progress = conversionStatus.progress;
-                _conversionTasks[file] = _conversionTasks[file]!.copyWith(
-                  progress: conversionStatus.progress.clamp(0.0, 1.0).toDouble(),
+                _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
+                  progress:
+                      conversionStatus.progress.clamp(0.0, 1.0).toDouble(),
                 );
                 notifyListeners();
               }
@@ -346,7 +349,7 @@ class ConversionProvider extends ChangeNotifier {
             if (result.success) {
               _processedFiles.add(file);
             }
-            _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+            _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
               outputPath: outputPath,
               progress: result.success ? 1 : _progress,
               completed: true,
@@ -367,7 +370,7 @@ class ConversionProvider extends ChangeNotifier {
             error: _mapBackendError(e.toString()),
           );
           _results[file] = result;
-          _conversionTasks[file] = _conversionTasks[file]!.copyWith(
+          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
             completed: true,
             failed: true,
           );

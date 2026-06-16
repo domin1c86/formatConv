@@ -118,6 +118,17 @@ const Map<String, FormatDescription> formatDescriptions = {
       'EXIF metadata'
     ],
   ),
+  'JPG': FormatDescription(
+    name: 'JPG',
+    description:
+        'Common JPEG file extension for photographs and web images.',
+    features: [
+      'Lossy compression',
+      'Small file size',
+      'Universal support',
+      'EXIF metadata'
+    ],
+  ),
   'PNG': FormatDescription(
     name: 'PNG',
     description:
@@ -288,6 +299,7 @@ const Map<String, List<String>> formatCodecs = {
   '3GP': ['H.263', 'H.264', 'MPEG-4'],
   // Image
   'JPEG': ['Baseline', 'Progressive'],
+  'JPG': ['Baseline', 'Progressive'],
   'PNG': ['Deflate'],
   'WebP': ['Lossy', 'Lossless'],
   'TIFF': ['LZW', 'Deflate', 'Uncompressed'],

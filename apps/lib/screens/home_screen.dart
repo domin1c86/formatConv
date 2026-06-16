@@ -1048,14 +1048,52 @@ class _FormatSelectionState extends State<_FormatSelection> {
   }
 }
 
-class _ConversionTaskShelf extends StatelessWidget {
+class _ConversionTaskShelf extends StatefulWidget {
   final List<ConversionTask> tasks;
 
   const _ConversionTaskShelf({required this.tasks});
 
   @override
+  State<_ConversionTaskShelf> createState() => _ConversionTaskShelfState();
+}
+
+class _ConversionTaskShelfState extends State<_ConversionTaskShelf> {
+  final ScrollController _scrollController = ScrollController();
+  int _lastTaskCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastTaskCount = widget.tasks.length;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversionTaskShelf oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tasks.length > _lastTaskCount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.minScrollExtent,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+    _lastTaskCount = widget.tasks.length;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tokens = _themeTokens(context);
+    final orderedTasks = widget.tasks.reversed.toList(growable: false);
     return Center(
       child: Container(
         width: 420,
@@ -1073,12 +1111,20 @@ class _ConversionTaskShelf extends StatelessWidget {
             ),
           ],
         ),
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: tasks.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, index) => _ConversionTaskCard(
-            task: tasks[index],
+        child: Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          trackVisibility: true,
+          notificationPredicate: (notification) => notification.depth == 0,
+          child: ListView.separated(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 10),
+            itemCount: orderedTasks.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) => _ConversionTaskCard(
+              task: orderedTasks[index],
+            ),
           ),
         ),
       ),
@@ -1116,7 +1162,7 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
         : widget.task.progress.clamp(0.0, 1.0).toDouble();
     const cardWidth = 96.0;
     const cardHeight = 116.0;
-    const statusIconSize = cardHeight / 20;
+    const statusIconSize = cardHeight / 5;
     final canOpen = widget.task.completed &&
         !widget.task.failed &&
         widget.task.outputPath.isNotEmpty;
@@ -1168,14 +1214,10 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
                   child: Column(
                     children: [
                       Expanded(
-                        child: Icon(
-                          _fileType(widget.task.inputPath) == _FileTab.audio
-                              ? Icons.graphic_eq_rounded
-                              : _fileType(widget.task.inputPath) == _FileTab.image
-                                  ? Icons.image_outlined
-                                  : Icons.movie_outlined,
-                          color: tokens.ink,
-                          size: 24,
+                        child: _TaskPreview(
+                          inputPath: widget.task.inputPath,
+                          outputPath: widget.task.outputPath,
+                          showOutputPreview: canOpen,
                         ),
                       ),
                       Text(
@@ -1225,6 +1267,63 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
         ),
       ),
     );
+  }
+}
+
+class _TaskPreview extends StatelessWidget {
+  final String inputPath;
+  final String outputPath;
+  final bool showOutputPreview;
+
+  const _TaskPreview({
+    required this.inputPath,
+    required this.outputPath,
+    required this.showOutputPreview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    final previewPath = showOutputPreview && outputPath.isNotEmpty
+        ? outputPath
+        : inputPath;
+    final type = _fileType(previewPath);
+    final fallback = Icon(
+      type == _FileTab.audio
+          ? Icons.graphic_eq_rounded
+          : type == _FileTab.image
+              ? Icons.image_outlined
+              : Icons.movie_outlined,
+      color: tokens.ink,
+      size: 24,
+    );
+
+    if (!showOutputPreview) return fallback;
+
+    if (type == _FileTab.image) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.file(
+          File(previewPath),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => fallback,
+        ),
+      );
+    }
+
+    if (type == _FileTab.video) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: _VideoPreview(
+          filePath: previewPath,
+          fallback: fallback,
+        ),
+      );
+    }
+
+    return fallback;
   }
 }
 

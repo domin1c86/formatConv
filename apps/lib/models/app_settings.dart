@@ -85,6 +85,7 @@ const supportedVideoFormats = [
 ];
 const supportedImageFormats = [
   'JPEG',
+  'JPG',
   'PNG',
   'WebP',
   'TIFF',
@@ -248,6 +249,12 @@ class AppSettings {
       return fallback.toSet();
     }
 
+    final visibleImageFormats =
+        readSet('visibleImageFormats', supportedImageFormats);
+    if (visibleImageFormats.contains('JPEG')) {
+      visibleImageFormats.add('JPG');
+    }
+
     return AppSettings(
       language: AppLanguage.values.firstWhere(
         (v) => v.name == json['language'],
@@ -270,8 +277,7 @@ class AppSettings {
       appIconPath: json['appIconPath'] as String? ?? '',
       visibleVideoFormats:
           readSet('visibleVideoFormats', supportedVideoFormats),
-      visibleImageFormats:
-          readSet('visibleImageFormats', supportedImageFormats),
+      visibleImageFormats: visibleImageFormats,
       visibleAudioFormats:
           readSet('visibleAudioFormats', supportedAudioFormats),
       developerMode: json['developerMode'] as bool? ?? false,

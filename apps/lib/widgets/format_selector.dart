@@ -53,6 +53,7 @@ const _videoFormats = [
 ];
 const _imageFormats = [
   'JPEG',
+  'JPG',
   'PNG',
   'WebP',
   'TIFF',
