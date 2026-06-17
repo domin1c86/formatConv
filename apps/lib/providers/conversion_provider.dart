@@ -16,35 +16,46 @@ final conversionProvider = ChangeNotifierProvider<ConversionProvider>((ref) {
 });
 
 class ConversionTask {
+  final String id;
   final String inputPath;
   final String outputPath;
+  final int? conversionId;
   final double progress;
   final DateTime startedAt;
   final bool completed;
   final bool failed;
+  final bool cancelled;
 
   const ConversionTask({
+    required this.id,
     required this.inputPath,
     required this.outputPath,
+    this.conversionId,
     required this.progress,
     required this.startedAt,
     this.completed = false,
     this.failed = false,
+    this.cancelled = false,
   });
 
   ConversionTask copyWith({
     String? outputPath,
+    int? conversionId,
     double? progress,
     bool? completed,
     bool? failed,
+    bool? cancelled,
   }) {
     return ConversionTask(
+      id: id,
       inputPath: inputPath,
       outputPath: outputPath ?? this.outputPath,
+      conversionId: conversionId ?? this.conversionId,
       progress: progress ?? this.progress,
       startedAt: startedAt,
       completed: completed ?? this.completed,
       failed: failed ?? this.failed,
+      cancelled: cancelled ?? this.cancelled,
     );
   }
 }
@@ -94,6 +105,24 @@ class ConversionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void removeFile(String file) {
+    _selectedFiles = _selectedFiles.where((item) => item != file).toList();
+    _processedFiles.remove(file);
+    _results.remove(file);
+
+    final relatedTasks = _conversionTasks.entries
+        .where((entry) => entry.value.inputPath == file)
+        .toList(growable: false);
+    for (final entry in relatedTasks) {
+      final conversionId = entry.value.conversionId;
+      if (conversionId != null && !entry.value.completed) {
+        _service.cancelConversion(conversionId);
+      }
+      _conversionTasks.remove(entry.key);
+    }
+    notifyListeners();
+  }
+
   void selectFormat(String format) {
     _selectedFormat = format;
     notifyListeners();
@@ -124,6 +153,13 @@ class ConversionProvider extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  void _updateTask(
+      String taskKey, ConversionTask Function(ConversionTask) map) {
+    final task = _conversionTasks[taskKey];
+    if (task == null) return;
+    _conversionTasks[taskKey] = map(task);
   }
 
   Future<bool> _checkDiskSpace(String outputPath, int inputSizeBytes) async {
@@ -213,6 +249,9 @@ class ConversionProvider extends ChangeNotifier {
 
     try {
       for (final file in targetFiles) {
+        if (!_selectedFiles.contains(file)) {
+          continue;
+        }
         final startedAt = DateTime.now();
         if (!File(file).existsSync()) {
           final result = ConversionResult(
@@ -258,6 +297,7 @@ class ConversionProvider extends ChangeNotifier {
         final taskKey =
             '${startedAt.microsecondsSinceEpoch}_${file.hashCode}_${outputPath.hashCode}';
         _conversionTasks[taskKey] = ConversionTask(
+          id: taskKey,
           inputPath: file,
           outputPath: outputPath,
           progress: 0,
@@ -275,9 +315,9 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'permission_write'),
           );
           _results[file] = result;
-          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-            completed: true,
-            failed: true,
+          _updateTask(
+            taskKey,
+            (task) => task.copyWith(completed: true, failed: true),
           );
           notifyListeners();
           onResult?.call(result);
@@ -295,9 +335,9 @@ class ConversionProvider extends ChangeNotifier {
             error: _friendlyError('', 'no_space'),
           );
           _results[file] = result;
-          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-            completed: true,
-            failed: true,
+          _updateTask(
+            taskKey,
+            (task) => task.copyWith(completed: true, failed: true),
           );
           notifyListeners();
           onResult?.call(result);
@@ -311,12 +351,21 @@ class ConversionProvider extends ChangeNotifier {
             options,
             (id, progress, processed, total, status, error) {
               _progress = progress;
-              _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-                progress: progress.clamp(0.0, 1.0).toDouble(),
+              final byteProgress = total > 0
+                  ? (processed / total).clamp(0.0, 0.95).toDouble()
+                  : progress.clamp(0.0, 0.95).toDouble();
+              _updateTask(
+                taskKey,
+                (task) => task.copyWith(progress: byteProgress),
               );
               notifyListeners();
             },
           );
+          _updateTask(
+            taskKey,
+            (task) => task.copyWith(conversionId: conversionId),
+          );
+          notifyListeners();
 
           try {
             ConversionStatus? conversionStatus;
@@ -326,10 +375,16 @@ class ConversionProvider extends ChangeNotifier {
                   await _service.getConversionStatus(conversionId);
               if (conversionStatus != null) {
                 _currentStatus = conversionStatus;
-                _progress = conversionStatus.progress;
-                _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-                  progress:
-                      conversionStatus.progress.clamp(0.0, 1.0).toDouble(),
+                final byteProgress = conversionStatus.totalBytes > 0
+                    ? (conversionStatus.processedBytes /
+                            conversionStatus.totalBytes)
+                        .clamp(0.0, 0.95)
+                        .toDouble()
+                    : conversionStatus.progress.clamp(0.0, 0.95).toDouble();
+                _progress = byteProgress;
+                _updateTask(
+                  taskKey,
+                  (task) => task.copyWith(progress: byteProgress),
                 );
                 notifyListeners();
               }
@@ -345,15 +400,22 @@ class ConversionProvider extends ChangeNotifier {
               finishedAt: DateTime.now(),
               error: failed ? _mapBackendError(conversionStatus?.error) : null,
             );
+            if (!_selectedFiles.contains(file)) {
+              continue;
+            }
             _results[file] = result;
             if (result.success) {
               _processedFiles.add(file);
             }
-            _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-              outputPath: outputPath,
-              progress: result.success ? 1 : _progress,
-              completed: true,
-              failed: !result.success,
+            _updateTask(
+              taskKey,
+              (task) => task.copyWith(
+                outputPath: outputPath,
+                progress: result.success ? 1 : _progress,
+                completed: true,
+                failed: !result.success,
+                cancelled: conversionStatus?.status == 'cancelled',
+              ),
             );
             notifyListeners();
             onResult?.call(result);
@@ -369,10 +431,13 @@ class ConversionProvider extends ChangeNotifier {
             finishedAt: DateTime.now(),
             error: _mapBackendError(e.toString()),
           );
+          if (!_selectedFiles.contains(file)) {
+            continue;
+          }
           _results[file] = result;
-          _conversionTasks[taskKey] = _conversionTasks[taskKey]!.copyWith(
-            completed: true,
-            failed: true,
+          _updateTask(
+            taskKey,
+            (task) => task.copyWith(completed: true, failed: true),
           );
           notifyListeners();
           onResult?.call(result);
@@ -417,6 +482,23 @@ class ConversionProvider extends ChangeNotifier {
       _isConverting = false;
       notifyListeners();
     }
+  }
+
+  Future<void> cancelTask(String taskId) async {
+    final task = _conversionTasks[taskId];
+    final conversionId = task?.conversionId;
+    if (task == null || task.completed || conversionId == null) return;
+
+    final cancelled = await _service.cancelConversion(conversionId);
+    _conversionTasks[taskId] = task.copyWith(
+      completed: cancelled,
+      failed: cancelled,
+      cancelled: cancelled,
+    );
+    if (cancelled) {
+      _isConverting = _conversionTasks.values.any((item) => !item.completed);
+    }
+    notifyListeners();
   }
 
   String _generateOutputPath(

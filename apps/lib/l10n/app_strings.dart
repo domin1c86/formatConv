@@ -53,6 +53,7 @@ class AppStrings {
   String get conversionFailed => isZh ? '转换失败' : 'Conversion failed';
   String get converting => isZh ? '正在转换...' : 'Converting...';
   String get cancel => isZh ? '取消' : 'Cancel';
+  String get removeFile => isZh ? '移除文件' : 'Remove file';
   String get confirm => isZh ? '确定' : 'OK';
   String get common => isZh ? '常规' : 'General';
   String get preferences => isZh ? '偏好' : 'Preferences';

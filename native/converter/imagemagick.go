@@ -27,7 +27,7 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 	if err != nil {
 		return fmt.Errorf("cannot stat input file: %w", err)
 	}
-	totalBytes := inputInfo.Size()
+	expectedBytes := estimateOutputSize(inputInfo.Size(), options)
 
 	if !options.Overwrite {
 		if _, err := os.Stat(outputPath); err == nil {
@@ -43,7 +43,7 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 		progressCallback(0.0)
 	}
 	if byteCallback != nil {
-		byteCallback(0, totalBytes)
+		byteCallback(0, expectedBytes)
 	}
 
 	magickPath, err := ResolveBinary("magick")
@@ -57,6 +57,7 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 	args := e.buildArgs(inputPath, outputPath, options)
 
 	cmd := exec.CommandContext(ctx, magickPath, args...)
+	configureBackgroundCommand(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("cannot start ImageMagick: %w", err)
@@ -83,7 +84,11 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 				progressCallback(1.0)
 			}
 			if byteCallback != nil {
-				byteCallback(totalBytes, totalBytes)
+				finalSize := expectedBytes
+				if outInfo, err := os.Stat(outputPath); err == nil && outInfo.Size() > 0 {
+					finalSize = outInfo.Size()
+				}
+				byteCallback(finalSize, finalSize)
 			}
 			return nil
 		case <-ticker.C:
@@ -91,8 +96,14 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 			var processed int64
 			if outInfo, err := os.Stat(outputPath); err == nil {
 				processed = outInfo.Size()
-				if totalBytes > 0 {
-					progress = float64(processed) / float64(totalBytes)
+				if processed > expectedBytes {
+					expectedBytes = int64(float64(processed) / 0.95)
+					if expectedBytes < processed {
+						expectedBytes = processed
+					}
+				}
+				if expectedBytes > 0 {
+					progress = float64(processed) / float64(expectedBytes)
 					if progress > 0.95 {
 						progress = 0.95 // Cap at 95% until process completes
 					}
@@ -102,7 +113,7 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 				progressCallback(progress)
 			}
 			if byteCallback != nil {
-				byteCallback(processed, totalBytes)
+				byteCallback(processed, expectedBytes)
 			}
 		}
 	}

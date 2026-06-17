@@ -47,6 +47,7 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 
 	args := e.buildArgs(inputPath, outputPath, options)
 	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
+	configureBackgroundCommand(cmd)
 
 	// Drain stderr in background to prevent pipe blocking
 	stderr, err := cmd.StderrPipe()
@@ -78,8 +79,9 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 	if progressCallback != nil {
 		progressCallback(0.0)
 	}
+	expectedSize := estimateOutputSize(inputSize, options)
 	if byteCallback != nil {
-		byteCallback(0, inputSize)
+		byteCallback(0, expectedSize)
 	}
 
 	for {
@@ -94,7 +96,11 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 				progressCallback(1.0)
 			}
 			if byteCallback != nil {
-				byteCallback(inputSize, inputSize)
+				finalSize := expectedSize
+				if outInfo, err := os.Stat(outputPath); err == nil && outInfo.Size() > 0 {
+					finalSize = outInfo.Size()
+				}
+				byteCallback(finalSize, finalSize)
 			}
 			return nil
 		case <-ticker.C:
@@ -102,8 +108,14 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 			var processed int64
 			if outInfo, err := os.Stat(outputPath); err == nil {
 				processed = outInfo.Size()
-				if inputSize > 0 {
-					progress = float64(processed) / float64(inputSize)
+				if processed > expectedSize {
+					expectedSize = int64(float64(processed) / 0.95)
+					if expectedSize < processed {
+						expectedSize = processed
+					}
+				}
+				if expectedSize > 0 {
+					progress = float64(processed) / float64(expectedSize)
 					if progress > 0.95 {
 						progress = 0.95 // Cap at 95% until process completes
 					}
@@ -113,7 +125,7 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 				progressCallback(progress)
 			}
 			if byteCallback != nil {
-				byteCallback(processed, inputSize)
+				byteCallback(processed, expectedSize)
 			}
 		}
 	}
@@ -216,6 +228,7 @@ func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float6
 		"-of", "default=noprint_wrappers=1:nokey=1",
 		inputPath,
 	)
+	configureBackgroundCommand(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return 0
@@ -225,6 +238,23 @@ func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float6
 		return 0
 	}
 	return duration
+}
+
+func estimateOutputSize(inputSize int64, options models.ConversionOptions) int64 {
+	if inputSize <= 0 {
+		return 1
+	}
+	if options.Lossless || options.Quality >= 100 {
+		return inputSize
+	}
+	if options.Quality <= 0 {
+		return inputSize
+	}
+	estimated := int64(float64(inputSize) * float64(options.Quality) / 100.0)
+	if estimated < 1 {
+		return 1
+	}
+	return estimated
 }
 
 func (e *FFmpegEngine) parseTime(line string) float64 {

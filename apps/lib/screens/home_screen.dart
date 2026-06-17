@@ -105,6 +105,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
                             onFileSelectionChanged: _toggleFileSelection,
+                            onFileRemoved: _removeFile,
                             onOpenSettings: () =>
                                 _showSettings(settingsController),
                           ),
@@ -151,6 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
                             onFileSelectionChanged: _toggleFileSelection,
+                            onFileRemoved: _removeFile,
                             onOpenSettings: () =>
                                 _showSettings(settingsController),
                           ),
@@ -216,6 +218,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     });
   }
+
+  void _removeFile(String filePath) {
+    ref.read(conversionProvider).removeFile(filePath);
+    setState(() => _selectedFileCards.remove(filePath));
+  }
 }
 
 class _LeftPane extends StatelessWidget {
@@ -227,6 +234,7 @@ class _LeftPane extends StatelessWidget {
   final ValueChanged<_FileTab> onFileTabChanged;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onFileSelectionChanged;
+  final ValueChanged<String> onFileRemoved;
   final VoidCallback onOpenSettings;
 
   const _LeftPane({
@@ -238,6 +246,7 @@ class _LeftPane extends StatelessWidget {
     required this.onFileTabChanged,
     required this.onPageChanged,
     required this.onFileSelectionChanged,
+    required this.onFileRemoved,
     required this.onOpenSettings,
   });
 
@@ -275,6 +284,7 @@ class _LeftPane extends StatelessWidget {
                 onTabChanged: onFileTabChanged,
                 onPageChanged: onPageChanged,
                 onFileSelectionChanged: onFileSelectionChanged,
+                onFileRemoved: onFileRemoved,
               ),
             ),
             const SizedBox(height: 12),
@@ -425,6 +435,7 @@ class _AddedFilesPanel extends StatefulWidget {
   final ValueChanged<_FileTab> onTabChanged;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onFileSelectionChanged;
+  final ValueChanged<String> onFileRemoved;
 
   const _AddedFilesPanel({
     required this.strings,
@@ -437,6 +448,7 @@ class _AddedFilesPanel extends StatefulWidget {
     required this.onTabChanged,
     required this.onPageChanged,
     required this.onFileSelectionChanged,
+    required this.onFileRemoved,
   });
 
   @override
@@ -545,12 +557,14 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
                             final file = visible[index];
                             return _FileCard(
                               key: ValueKey(file),
+                              strings: widget.strings,
                               filePath: file,
                               selected: widget.selectedFiles.contains(file),
                               processed: widget.processedFiles.contains(file),
                               selectedFiles: widget.selectedFiles,
                               onToggleSelected: () =>
                                   widget.onFileSelectionChanged(file),
+                              onRemove: () => widget.onFileRemoved(file),
                             );
                           },
                         );
@@ -601,19 +615,23 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
 }
 
 class _FileCard extends StatefulWidget {
+  final AppStrings strings;
   final String filePath;
   final bool selected;
   final bool processed;
   final Set<String> selectedFiles;
   final VoidCallback onToggleSelected;
+  final VoidCallback onRemove;
 
   const _FileCard({
     super.key,
+    required this.strings,
     required this.filePath,
     required this.selected,
     required this.processed,
     required this.selectedFiles,
     required this.onToggleSelected,
+    required this.onRemove,
   });
 
   @override
@@ -637,6 +655,8 @@ class _FileCardState extends State<_FileCard> {
       _FileTab.image => Icons.image_outlined,
       _FileTab.all => Icons.insert_drive_file_outlined,
     };
+    const cardHeight = 116.0;
+    const closeIconSize = cardHeight / 5;
 
     final child = AnimatedContainer(
       duration: const Duration(milliseconds: 140),
@@ -719,6 +739,43 @@ class _FileCardState extends State<_FileCard> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            top: 3,
+            right: 3,
+            child: IgnorePointer(
+              ignoring: !_hovering,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _hovering ? 1 : 0,
+                child: Tooltip(
+                  message: widget.strings.removeFile,
+                  waitDuration: const Duration(milliseconds: 500),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onRemove,
+                      child: Container(
+                        width: closeIconSize + 8,
+                        height: closeIconSize + 8,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: tokens.surface.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: tokens.border),
+                        ),
+                        child: SvgPicture.asset(
+                          'windows/runner/resources/close.svg',
+                          width: closeIconSize,
+                          height: closeIconSize,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -984,7 +1041,10 @@ class _FormatSelectionState extends State<_FormatSelection> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _ConversionTaskShelf(tasks: widget.provider.conversionTasks),
+            child: _ConversionTaskShelf(
+              tasks: widget.provider.conversionTasks,
+              onCancelTask: (taskId) => widget.provider.cancelTask(taskId),
+            ),
           ),
       ],
     );
@@ -1050,8 +1110,12 @@ class _FormatSelectionState extends State<_FormatSelection> {
 
 class _ConversionTaskShelf extends StatefulWidget {
   final List<ConversionTask> tasks;
+  final void Function(String taskId) onCancelTask;
 
-  const _ConversionTaskShelf({required this.tasks});
+  const _ConversionTaskShelf({
+    required this.tasks,
+    required this.onCancelTask,
+  });
 
   @override
   State<_ConversionTaskShelf> createState() => _ConversionTaskShelfState();
@@ -1124,6 +1188,7 @@ class _ConversionTaskShelfState extends State<_ConversionTaskShelf> {
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) => _ConversionTaskCard(
               task: orderedTasks[index],
+              onCancel: () => widget.onCancelTask(orderedTasks[index].id),
             ),
           ),
         ),
@@ -1134,8 +1199,12 @@ class _ConversionTaskShelfState extends State<_ConversionTaskShelf> {
 
 class _ConversionTaskCard extends StatefulWidget {
   final ConversionTask task;
+  final VoidCallback onCancel;
 
-  const _ConversionTaskCard({required this.task});
+  const _ConversionTaskCard({
+    required this.task,
+    required this.onCancel,
+  });
 
   @override
   State<_ConversionTaskCard> createState() => _ConversionTaskCardState();
@@ -1147,8 +1216,10 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && !widget.task.completed) {
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted &&
+          !widget.task.completed &&
+          widget.task.conversionId != null) {
         setState(() => _showCancel = true);
       }
     });
@@ -1165,11 +1236,19 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
     const statusIconSize = cardHeight / 5;
     final canOpen = widget.task.completed &&
         !widget.task.failed &&
-        widget.task.outputPath.isNotEmpty;
+        widget.task.outputPath.isNotEmpty &&
+        File(widget.task.outputPath).existsSync();
     final displayName = widget.task.outputPath.isNotEmpty
         ? p.basename(widget.task.outputPath)
         : p.basename(widget.task.inputPath);
-    final cancelOpacity = !_showCancel || widget.task.completed
+    final elapsedLongEnough =
+        DateTime.now().difference(widget.task.startedAt) >=
+            const Duration(milliseconds: 1500);
+    final canCancel = (_showCancel || elapsedLongEnough) &&
+        !widget.task.completed &&
+        widget.task.conversionId != null &&
+        !widget.task.cancelled;
+    final cancelOpacity = !canCancel
         ? 0.0
         : progress >= 0.95
             ? (1 - ((progress - 0.95) / 0.05)).clamp(0.0, 1.0).toDouble()
@@ -1252,13 +1331,29 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
                 Positioned(
                   top: 6,
                   right: 6,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 650),
-                    opacity: cancelOpacity,
-                    child: SvgPicture.asset(
-                      'windows/runner/resources/cancel.svg',
-                      width: statusIconSize,
-                      height: statusIconSize,
+                  child: IgnorePointer(
+                    ignoring: cancelOpacity <= 0,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 650),
+                      opacity: cancelOpacity,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onCancel,
+                          child: SizedBox(
+                            width: statusIconSize + 8,
+                            height: statusIconSize + 8,
+                            child: Center(
+                              child: SvgPicture.asset(
+                                'windows/runner/resources/cancel.svg',
+                                width: statusIconSize,
+                                height: statusIconSize,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
