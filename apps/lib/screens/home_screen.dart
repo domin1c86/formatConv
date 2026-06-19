@@ -85,6 +85,7 @@ const _audioExtensions = {
   '.ogg',
   '.wma',
   '.m4a',
+  '.mka',
   '.opus'
 };
 
@@ -1907,12 +1908,11 @@ class _MediaOperationCardState extends State<_MediaOperationCard> {
           (file) => _fileType(file) == _FileTab.video || _isGifFile(file)),
       onAcceptWithDetails: (details) => widget.onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
-        final tokens = _themeTokens(context);
         final active = candidateData.isNotEmpty;
         final rejected = rejectedData.isNotEmpty;
         return MouseRegion(
           cursor:
-              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.basic,
           onEnter: (_) => _setHovering(true),
           onExit: (_) => _setHovering(false),
           child: _operationCardShell(
@@ -1923,33 +1923,24 @@ class _MediaOperationCardState extends State<_MediaOperationCard> {
             child: Row(
               children: [
                 Expanded(
-                  child: InkWell(
-                    hoverColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    borderRadius: BorderRadius.circular(tokens.cardRadius),
-                    onTap: widget.onTap,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward_rounded, size: 16),
-                        ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Text(
+                      widget.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.settings_outlined, size: 16),
+                _CardActionButton(
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: widget.onTap,
+                ),
+                _CardActionButton(
+                  icon: Icons.settings_outlined,
                   onPressed: widget.onSettings,
                 ),
               ],
@@ -1995,12 +1986,11 @@ class _MergeOperationCardState extends State<_MergeOperationCard> {
           _fileType(file) == _FileTab.video || _fileType(file) == _FileTab.audio),
       onAcceptWithDetails: (details) => widget.onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
-        final tokens = _themeTokens(context);
         final active = candidateData.isNotEmpty;
         final rejected = rejectedData.isNotEmpty;
         return MouseRegion(
           cursor:
-              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.basic,
           onEnter: (_) => _setHovering(true),
           onExit: (_) => _setHovering(false),
           child: _operationCardShell(
@@ -2011,33 +2001,24 @@ class _MergeOperationCardState extends State<_MergeOperationCard> {
             child: Row(
               children: [
                 Expanded(
-                  child: InkWell(
-                    hoverColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    borderRadius: BorderRadius.circular(tokens.cardRadius),
-                    onTap: widget.onTap,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.label,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward_rounded, size: 16),
-                        ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Text(
+                      widget.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.settings_outlined, size: 16),
+                _CardActionButton(
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: widget.onTap,
+                ),
+                _CardActionButton(
+                  icon: Icons.settings_outlined,
                   onPressed: widget.onSettings,
                 ),
               ],
@@ -2084,6 +2065,28 @@ Widget _operationCardShell({
     ),
     child: child,
   );
+}
+
+class _CardActionButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _CardActionButton({
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      mouseCursor: SystemMouseCursors.click,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 40),
+      padding: EdgeInsets.zero,
+      icon: Icon(icon, size: 16),
+      onPressed: onPressed,
+    );
+  }
 }
 
 class _MergeFileList extends StatefulWidget {
@@ -2217,7 +2220,7 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
         return MouseRegion(
           cursor: rejected
               ? SystemMouseCursors.forbidden
-              : SystemMouseCursors.click,
+              : SystemMouseCursors.basic,
           onEnter: (_) => setState(() => _hovering = true),
           onExit: (_) => setState(() => _hovering = false),
           child: AnimatedContainer(
@@ -2247,35 +2250,24 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
             child: Row(
               children: [
                 Expanded(
-                  child: InkWell(
-                    mouseCursor: SystemMouseCursors.click,
-                    hoverColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(12)),
-                    onTap: () => widget.onConvert(context, null),
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.format,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward_rounded, size: 16),
-                        ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Text(
+                      widget.format,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.settings_outlined, size: 16),
+                _CardActionButton(
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: () => widget.onConvert(context, null),
+                ),
+                _CardActionButton(
+                  icon: Icons.settings_outlined,
                   onPressed: () => _showFormatSettings(context),
                 ),
               ],
@@ -2866,8 +2858,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(tokens.cardRadius + 8),
         ),
-        child: ColoredBox(
+        child: Material(
+          type: MaterialType.canvas,
           color: tokens.surface,
+          clipBehavior: Clip.antiAlias,
+          borderRadius: BorderRadius.circular(tokens.cardRadius + 8),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 980, maxHeight: 720),
             child: Row(

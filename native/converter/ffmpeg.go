@@ -119,7 +119,27 @@ func (e *FFmpegEngine) RunMediaOperation(ctx context.Context, options models.Med
 	if infoCallback != nil {
 		infoCallback(command.executionInfo())
 	}
-	return e.runFFmpeg(ctx, ffmpegPath, command.Args, outputArg(command.Args), inputSize, progressCallback, byteCallback)
+	outputPath := outputArg(command.Args)
+	if err := e.runFFmpeg(ctx, ffmpegPath, command.Args, outputPath, inputSize, progressCallback, byteCallback); err != nil {
+		return err
+	}
+	if strings.EqualFold(options.Operation, "split_audio") {
+		if len(options.Inputs) != 1 {
+			return fmt.Errorf("split audio duration validation requires exactly one input file")
+		}
+		return e.validateSplitAudioOutput(
+			ctx,
+			ffmpegPath,
+			options.Inputs[0],
+			outputPath,
+			options.Overwrite,
+			inputSize,
+			progressCallback,
+			byteCallback,
+			infoCallback,
+		)
+	}
+	return nil
 }
 
 func (e *FFmpegEngine) buildMediaOperationCommand(ctx context.Context, options models.MediaOperationOptions) (ffmpegCommand, int64, error) {
@@ -152,7 +172,15 @@ func (e *FFmpegEngine) buildSplitVideoCommand(ctx context.Context, options model
 	if err != nil {
 		return ffmpegCommand{}, 0, err
 	}
-	args := []string{"-i", inputPath, "-map", "0:v:0", "-c:v", "copy", "-an"}
+	args := []string{
+		"-fflags", "+genpts",
+		"-i", inputPath,
+		"-map", "0:v:0",
+		"-c:v", "copy",
+		"-an",
+		"-map_metadata", "0",
+		"-avoid_negative_ts", "make_zero",
+	}
 	if options.Overwrite {
 		args = append(args, "-y")
 	}
@@ -182,7 +210,18 @@ func (e *FFmpegEngine) buildSplitAudioCommand(ctx context.Context, options model
 	if err != nil {
 		return ffmpegCommand{}, 0, err
 	}
-	args := []string{"-i", inputPath, "-map", "0:a:0", "-c:a", "copy", "-vn"}
+	args := []string{
+		"-fflags", "+genpts",
+		"-i", inputPath,
+		"-map", "0:a:0",
+		"-c:a", "copy",
+		"-vn",
+		"-map_metadata", "0",
+		"-avoid_negative_ts", "make_zero",
+	}
+	if strings.EqualFold(filepath.Ext(outputPath), ".m4a") {
+		args = append(args, "-movflags", "+faststart")
+	}
 	if options.Overwrite {
 		args = append(args, "-y")
 	}
@@ -219,41 +258,55 @@ func (e *FFmpegEngine) buildMergeCommand(ctx context.Context, options models.Med
 
 	ext := strings.ToLower(filepath.Ext(videoPath))
 	spec := containerSpecFor(ext)
-	audioCodec := "copy"
-	audioReencoded := false
-	if !codecAllowed(audioInfo.Audio.Codec, spec.AudioCodecs) {
-		audioCodec = spec.DefaultAudioCodec
-		audioReencoded = true
+	videoDuration := e.getVideoDuration(ctx, videoPath)
+	if videoDuration <= 0 {
+		return ffmpegCommand{}, 0, fmt.Errorf(
+			"cannot determine source video duration; merge stopped to avoid an invalid output timeline",
+		)
 	}
 
+	audioCodec := mergeAudioEncoder(audioInfo.Audio.Codec, spec)
+	durationText := strconv.FormatFloat(videoDuration, 'f', 6, 64)
+	audioFilter := fmt.Sprintf(
+		"[1:a:0]atrim=duration=%s,asetpts=PTS-STARTPTS,apad=whole_dur=%s[external_audio]",
+		durationText,
+		durationText,
+	)
 	keepSourceAudio := !options.RemoveSourceAudio && videoInfo.Audio.Codec != ""
-	args := []string{"-i", videoPath, "-i", audioPath, "-map", "0:v:0"}
+	args := []string{
+		"-fflags", "+genpts",
+		"-i", videoPath,
+		"-i", audioPath,
+		"-filter_complex", audioFilter,
+		"-map", "0:v:0",
+	}
 	if keepSourceAudio {
 		args = append(args, "-map", "0:a:0?")
 	}
-	args = append(args, "-map", "1:a:0", "-c:v", "copy")
+	args = append(args, "-map", "[external_audio]", "-c:v", "copy")
 	if keepSourceAudio {
 		args = append(args, "-c:a:0", "copy")
 		args = append(args, "-c:a:1", audioCodec)
 	} else {
 		args = append(args, "-c:a", audioCodec)
 	}
-	if duration := e.getDuration(ctx, videoPath); duration > 0 {
-		args = append(args, "-t", strconv.FormatFloat(duration, 'f', 3, 64))
-	} else {
-		args = append(args, "-shortest")
+	args = append(
+		args,
+		"-map_metadata", "0",
+		"-map_chapters", "0",
+		"-t", durationText,
+		"-avoid_negative_ts", "make_zero",
+	)
+	if ext == ".mp4" || ext == ".mov" {
+		args = append(args, "-movflags", "+faststart")
 	}
 	if options.Overwrite {
 		args = append(args, "-y")
 	}
 	args = append(args, outputPath)
-	mode := "merge"
-	if audioReencoded {
-		mode = "merge_audio_encode"
-	}
 	return ffmpegCommand{
 		Args:         args,
-		Mode:         mode,
+		Mode:         "merge_audio_encode",
 		VideoEncoder: "copy",
 		ProbeWarning: strings.TrimSpace(strings.Join([]string{videoInfo.ProbeWarning, audioInfo.ProbeWarning}, " ")),
 	}, inputSizeOrDefault(videoPath), nil
@@ -670,7 +723,7 @@ func audioExtensionForCodec(codec string) string {
 	case "flac":
 		return ".flac"
 	case "aac":
-		return ".aac"
+		return ".m4a"
 	case "mp3":
 		return ".mp3"
 	case "opus":
@@ -684,6 +737,227 @@ func audioExtensionForCodec(codec string) string {
 	default:
 		return ".mka"
 	}
+}
+
+func mergeAudioEncoder(sourceCodec string, spec containerSpec) string {
+	if !codecAllowed(sourceCodec, spec.AudioCodecs) {
+		return spec.DefaultAudioCodec
+	}
+	switch normalizeCodec(sourceCodec) {
+	case "aac":
+		return "aac"
+	case "mp3":
+		return "libmp3lame"
+	case "flac":
+		return "flac"
+	case "opus":
+		return "libopus"
+	case "vorbis":
+		return "libvorbis"
+	case "alac":
+		return "alac"
+	case "ac3":
+		return "ac3"
+	case "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le":
+		return normalizeCodec(sourceCodec)
+	case "wmav2":
+		return "wmav2"
+	case "mp2":
+		return "mp2"
+	default:
+		return spec.DefaultAudioCodec
+	}
+}
+
+func (e *FFmpegEngine) validateSplitAudioOutput(
+	ctx context.Context,
+	ffmpegPath string,
+	inputPath string,
+	outputPath string,
+	overwrite bool,
+	inputSize int64,
+	progressCallback func(float64),
+	byteCallback func(processed, total int64),
+	infoCallback func(models.ConversionExecutionInfo),
+) error {
+	sourceDuration := e.getAudioDuration(ctx, inputPath)
+	if sourceDuration <= 0 {
+		sourceDuration = e.getVideoDuration(ctx, inputPath)
+	}
+	if sourceDuration <= 0 {
+		_ = os.Remove(outputPath)
+		return fmt.Errorf("cannot verify split audio duration because the source timeline is unavailable")
+	}
+
+	outputDuration := e.getAudioDuration(ctx, outputPath)
+	if audioDurationsMatch(sourceDuration, outputDuration) {
+		return nil
+	}
+
+	reason := fmt.Sprintf(
+		"split audio duration mismatch: source %.3fs, output %.3fs",
+		sourceDuration,
+		outputDuration,
+	)
+	_ = os.Remove(outputPath)
+
+	copyArgs := []string{
+		"-fflags", "+genpts+igndts",
+		"-i", inputPath,
+		"-map", "0:a:0",
+		"-c:a", "copy",
+		"-vn",
+		"-map_metadata", "0",
+		"-avoid_negative_ts", "make_zero",
+	}
+	if strings.EqualFold(filepath.Ext(outputPath), ".m4a") {
+		copyArgs = append(copyArgs, "-movflags", "+faststart")
+	}
+	copyArgs = append(copyArgs, "-y", outputPath)
+	if infoCallback != nil {
+		infoCallback(models.ConversionExecutionInfo{
+			Mode:         "split_audio_timestamp_repair",
+			VideoEncoder: "none",
+			ProbeWarning: reason + "; rebuilding timestamps in the codec's preferred container",
+			OutputPath:   outputPath,
+		})
+	}
+	copyErr := e.runFFmpeg(
+		ctx,
+		ffmpegPath,
+		copyArgs,
+		outputPath,
+		inputSize,
+		progressCallback,
+		byteCallback,
+	)
+	if copyErr == nil {
+		repairedDuration := e.getAudioDuration(ctx, outputPath)
+		if audioDurationsMatch(sourceDuration, repairedDuration) {
+			return nil
+		}
+	}
+	if ctx.Err() != nil {
+		_ = os.Remove(outputPath)
+		return ctx.Err()
+	}
+	_ = os.Remove(outputPath)
+
+	fallbackPath, err := prepareAudioFallbackPath(outputPath, overwrite)
+	if err != nil {
+		return fmt.Errorf("%s; cannot prepare Matroska fallback output: %w", reason, err)
+	}
+	mkaCopyArgs := []string{
+		"-fflags", "+genpts+igndts",
+		"-i", inputPath,
+		"-map", "0:a:0",
+		"-c:a", "copy",
+		"-vn",
+		"-map_metadata", "0",
+		"-avoid_negative_ts", "make_zero",
+		"-y",
+		fallbackPath,
+	}
+	if infoCallback != nil {
+		infoCallback(models.ConversionExecutionInfo{
+			Mode:         "split_audio_container_fallback",
+			VideoEncoder: "none",
+			ProbeWarning: reason + "; preferred container is still invalid, retrying in Matroska audio",
+			OutputPath:   fallbackPath,
+		})
+	}
+	mkaCopyErr := e.runFFmpeg(
+		ctx,
+		ffmpegPath,
+		mkaCopyArgs,
+		fallbackPath,
+		inputSize,
+		progressCallback,
+		byteCallback,
+	)
+	if mkaCopyErr == nil {
+		fallbackDuration := e.getAudioDuration(ctx, fallbackPath)
+		if audioDurationsMatch(sourceDuration, fallbackDuration) {
+			return nil
+		}
+	}
+	if ctx.Err() != nil {
+		_ = os.Remove(fallbackPath)
+		return ctx.Err()
+	}
+	_ = os.Remove(fallbackPath)
+
+	rebuildArgs := []string{
+		"-fflags", "+genpts",
+		"-i", inputPath,
+		"-map", "0:a:0",
+		"-af", "asetpts=N/SR/TB",
+		"-c:a", "flac",
+		"-vn",
+		"-map_metadata", "0",
+		"-avoid_negative_ts", "make_zero",
+		"-y",
+		fallbackPath,
+	}
+	if infoCallback != nil {
+		infoCallback(models.ConversionExecutionInfo{
+			Mode:         "split_audio_timestamp_rebuild",
+			VideoEncoder: "none",
+			ProbeWarning: reason + "; rebuilding a continuous lossless audio timeline",
+			OutputPath:   fallbackPath,
+		})
+	}
+	if err := e.runFFmpeg(
+		ctx,
+		ffmpegPath,
+		rebuildArgs,
+		fallbackPath,
+		inputSize,
+		progressCallback,
+		byteCallback,
+	); err != nil {
+		_ = os.Remove(fallbackPath)
+		return fmt.Errorf("%s; timestamp rebuild failed: %w", reason, err)
+	}
+
+	repairedDuration := e.getAudioDuration(ctx, fallbackPath)
+	if !audioDurationsMatch(sourceDuration, repairedDuration) {
+		_ = os.Remove(fallbackPath)
+		return fmt.Errorf(
+			"%s; rebuilt output duration is still invalid: %.3fs",
+			reason,
+			repairedDuration,
+		)
+	}
+	return nil
+}
+
+func prepareAudioFallbackPath(outputPath string, overwrite bool) (string, error) {
+	basePath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".mka"
+	if strings.EqualFold(basePath, outputPath) {
+		if overwrite {
+			return basePath, nil
+		}
+		if _, err := os.Stat(basePath); os.IsNotExist(err) {
+			return basePath, nil
+		}
+	}
+	return prepareOutputPath(basePath, overwrite)
+}
+
+func audioDurationsMatch(sourceDuration, outputDuration float64) bool {
+	if sourceDuration <= 0 || outputDuration <= 0 {
+		return false
+	}
+	tolerance := sourceDuration * 0.01
+	if tolerance < 1 {
+		tolerance = 1
+	}
+	difference := sourceDuration - outputDuration
+	if difference < 0 {
+		difference = -difference
+	}
+	return difference <= tolerance
 }
 
 func classifyMergeInputs(inputs []string) (string, string, error) {
@@ -715,7 +989,7 @@ func fileTypeByExtension(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv", ".wmv", ".mpeg", ".mpg", ".3gp":
 		return "video"
-	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".opus":
+	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".mka", ".opus":
 		return "audio"
 	default:
 		return ""
@@ -1166,7 +1440,7 @@ func gifFrameRate(options models.ConversionOptions) string {
 
 func isAudioOutput(outputPath string) bool {
 	switch strings.ToLower(filepath.Ext(outputPath)) {
-	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".opus":
+	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".mka", ".opus":
 		return true
 	default:
 		return false
@@ -1202,24 +1476,64 @@ func mapCodecName(uiName string) string {
 	return uiName
 }
 
-func (e *FFmpegEngine) getDuration(ctx context.Context, inputPath string) float64 {
+func (e *FFmpegEngine) getVideoDuration(ctx context.Context, inputPath string) float64 {
+	return e.getStreamDuration(ctx, inputPath, "v:0")
+}
+
+func (e *FFmpegEngine) getAudioDuration(ctx context.Context, inputPath string) float64 {
+	return e.getStreamDuration(ctx, inputPath, "a:0")
+}
+
+func (e *FFmpegEngine) getStreamDuration(ctx context.Context, inputPath, streamSelector string) float64 {
 	ffprobePath, err := ResolveBinary("ffprobe")
 	if err != nil {
 		return 0
 	}
-	cmd := exec.CommandContext(ctx, ffprobePath,
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		inputPath,
-	)
-	configureBackgroundCommand(cmd)
-	output, err := cmd.Output()
-	if err != nil {
-		return 0
+
+	for attempt := 1; attempt <= probeAttempts; attempt++ {
+		probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd := exec.CommandContext(
+			probeCtx,
+			ffprobePath,
+			"-v", "error",
+			"-select_streams", streamSelector,
+			"-show_entries", "stream=duration:format=duration",
+			"-of", "json",
+			inputPath,
+		)
+		configureBackgroundCommand(cmd)
+		output, commandErr := cmd.Output()
+		cancel()
+		if commandErr == nil {
+			var result struct {
+				Streams []struct {
+					Duration string `json:"duration"`
+				} `json:"streams"`
+				Format struct {
+					Duration string `json:"duration"`
+				} `json:"format"`
+			}
+			if json.Unmarshal(output, &result) == nil {
+				for _, stream := range result.Streams {
+					if duration := positiveDuration(stream.Duration); duration > 0 {
+						return duration
+					}
+				}
+				if duration := positiveDuration(result.Format.Duration); duration > 0 {
+					return duration
+				}
+			}
+		}
+		if !sleepBeforeProbeRetry(ctx, attempt) {
+			return 0
+		}
 	}
-	duration, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
-	if err != nil {
+	return 0
+}
+
+func positiveDuration(value string) float64 {
+	duration, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || duration <= 0 {
 		return 0
 	}
 	return duration

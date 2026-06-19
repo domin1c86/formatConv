@@ -235,6 +235,16 @@ func (d *FormatDetector) initFormats() {
 			"tag_support": "iTunes",
 		},
 	}
+	d.formatMap[".mka"] = models.FormatInfo{
+		Format: "MKA", Type: "audio", Extension: ".mka", MimeType: "audio/x-matroska",
+		Properties: map[string]string{
+			"bitrate":     "codec dependent",
+			"channels":    "codec dependent",
+			"sample_rate": "codec dependent",
+			"compression": "lossy/lossless",
+			"tag_support": "Matroska",
+		},
+	}
 	d.formatMap[".opus"] = models.FormatInfo{
 		Format: "OPUS", Type: "audio", Extension: ".opus", MimeType: "audio/opus",
 		Properties: map[string]string{

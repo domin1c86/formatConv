@@ -37,6 +37,7 @@ const _audioExtensions = {
   '.ogg',
   '.wma',
   '.m4a',
+  '.mka',
   '.opus'
 };
 
