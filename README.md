@@ -5,7 +5,10 @@
 <p align="center">
   <h1 align="center">Format Converter</h1>
   <p align="center"><em>面向 Windows 的本地视频、音频和图片转换工具，支持批量拖拽、流复制、音视频分离/合并、GPU 编码与历史记录。</em></p>
+
+  <p align="center"><em>更多功能演示视频可以点击 <a href="https://domin1c86.github.io/p/format-converter/" target="_blank">我的博客</a> 查看。</em></p>
 </p>
+
 
 ---
 

@@ -5,6 +5,7 @@
 <p align="center">
   <h1 align="center">Format Converter</h1>
   <p align="center"><em>A local Windows video, audio, and image converter with batch drag-and-drop, stream copy, media split/merge, GPU encoding, and conversion history.</em></p>
+  <p align="center"><em>For more function demos, please <a href="https://domin1c86.github.io/en/p/format-converter/" target="_blank">View My Blog</a>.</em></p>
 </p>
 
 ---
