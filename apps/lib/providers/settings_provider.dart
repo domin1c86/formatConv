@@ -57,7 +57,14 @@ class SettingsController extends ChangeNotifier {
 
   Future<void> update(AppSettings settings) async {
     _settings = settings;
-    notifyListeners();
+    // Defer the listener notification off the current synchronous continuation.
+    // Native pickers (e.g. file_picker's Win32 folder dialog) finish tearing
+    // down their modal window/message pump exactly when the awaiter resumes;
+    // notifying synchronously here forces a full widget rebuild inside that
+    // unsafe teardown window, which can crash the engine when mounted video
+    // previews are driving ffmpeg subprocesses / Image decoders. Letting the
+    // native modal close first (one microtask later) avoids the race.
+    Future.microtask(notifyListeners);
     await _writeFile(_settingsFileName, jsonEncode(_settings.toJson()));
   }
 

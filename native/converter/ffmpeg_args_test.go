@@ -2,6 +2,7 @@ package converter
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"native/models"
@@ -190,6 +191,81 @@ func TestBuildCommandWithInfo_RemuxReportsCopyMode(t *testing.T) {
 	}
 	if command.UsedHardware {
 		t.Fatal("remux command must not use hardware")
+	}
+}
+
+func TestBuildGifArgs_DefaultsToFifteenFpsAndCappedWidth(t *testing.T) {
+	engine := NewFFmpegEngine()
+	// All GIF options left on the default "source" sentinel: must NOT inherit
+	// the source video's high frame rate / resolution, which would make the
+	// 256-color per-frame GIF many times larger than the compressed input.
+	args := engine.buildGifArgs(models.ConversionOptions{})
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "fps=15") {
+		t.Fatalf("default GIF args must cap frame rate at 15fps, got: %v", args)
+	}
+	if !strings.Contains(joined, "scale=480:-1:flags=lanczos") {
+		t.Fatalf("default GIF args must cap width to 480px, got: %v", args)
+	}
+	if !strings.Contains(joined, "palettegen=max_colors=256") {
+		t.Fatalf("default GIF args must keep 256 colors, got: %v", args)
+	}
+	if !strings.Contains(joined, "paletteuse=dither=sierra2_4a") {
+		t.Fatalf("default GIF args must keep default dither, got: %v", args)
+	}
+	// Regression guard: the palette split chain must be joined to the scale
+	// filter with a comma. Without it "flags=lanczos" + "split" fuses into
+	// "flags=lanczossplit", which ffmpeg rejects as an unknown sws_flags
+	// constant and aborts the whole GIF conversion.
+	if !strings.Contains(joined, "flags=lanczos,split[s0][s1]") {
+		t.Fatalf("scale flags and split chain must be comma-separated, got: %v", args)
+	}
+	if strings.Contains(joined, "lanczossplit") {
+		t.Fatalf("lanczos and split must not be fused (missing comma), got: %v", args)
+	}
+}
+
+func TestBuildGifArgs_RespectsExplicitFrameRateAndScale(t *testing.T) {
+	engine := NewFFmpegEngine()
+	args := engine.buildGifArgs(models.ConversionOptions{
+		GifFrameRate: "30",
+		GifScale:     "720:-1",
+		GifMaxColors: "128",
+	})
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "fps=30") {
+		t.Fatalf("explicit fps=30 must be honored, got: %v", args)
+	}
+	if strings.Contains(joined, "fps=15") {
+		t.Fatalf("default fps must not override explicit fps, got: %v", args)
+	}
+	if !strings.Contains(joined, "scale=720:-1:flags=lanczos") {
+		t.Fatalf("explicit scale must be honored, got: %v", args)
+	}
+	if strings.Contains(joined, "scale=480:-1") {
+		t.Fatalf("default scale must not override explicit scale, got: %v", args)
+	}
+	if !strings.Contains(joined, "palettegen=max_colors=128") {
+		t.Fatalf("explicit max_colors must be honored, got: %v", args)
+	}
+}
+
+func TestBuildCommandWithInfo_GifUsesSafeDefaults(t *testing.T) {
+	engine := NewFFmpegEngine()
+	command := engine.buildCommandWithInfo(
+		"input.mp4",
+		"output.gif",
+		models.ConversionOptions{},
+		false,
+		nil,
+		mediaInfo{Video: mediaStreamInfo{Codec: "h264", FrameRate: "60000/1001"}},
+	)
+	joined := strings.Join(command.Args, " ")
+	if command.Mode != "gif_encode" {
+		t.Fatalf("expected gif_encode mode, got %q", command.Mode)
+	}
+	if !strings.Contains(joined, "fps=15") || !strings.Contains(joined, "scale=480:-1") {
+		t.Fatalf("mp4->gif with defaults must cap fps and width, got: %v", command.Args)
 	}
 }
 

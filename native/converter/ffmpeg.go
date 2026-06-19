@@ -554,12 +554,22 @@ func (e *FFmpegEngine) buildCommandWithInfo(inputPath, outputPath string, option
 
 func (e *FFmpegEngine) buildGifArgs(options models.ConversionOptions) []string {
 	filters := []string{}
-	if fps := gifFrameRate(options); fps != "" {
-		filters = append(filters, "fps="+fps)
+	// GIF is a per-frame 256-color lossless LZW format, the opposite of an
+	// inter-frame compressed codec like H.264. Letting a "source" (unset)
+	// frame rate and scale pass through means the GIF inherits the source
+	// video's full frame rate (often 30/60 fps) and full resolution, which
+	// balloons the output to many times the input size. Default to sane
+	// animation values when the user leaves them on "source".
+	fps := gifFrameRate(options)
+	if fps == "" {
+		fps = "15"
 	}
-	if scale := nonSource(options.GifScale); scale != "" {
-		filters = append(filters, "scale="+scale+":flags=lanczos")
+	filters = append(filters, "fps="+fps)
+	scale := nonSource(options.GifScale)
+	if scale == "" {
+		scale = "480:-1"
 	}
+	filters = append(filters, "scale="+scale+":flags=lanczos")
 	maxColors := nonSource(options.GifMaxColors)
 	if maxColors == "" {
 		maxColors = "256"
@@ -569,10 +579,10 @@ func (e *FFmpegEngine) buildGifArgs(options models.ConversionOptions) []string {
 		dither = "sierra2_4a"
 	}
 	filterPrefix := strings.Join(filters, ",")
-	if filterPrefix != "" {
-		filterPrefix += ","
-	}
-	filter := filterPrefix + "split[s0][s1];[s0]palettegen=max_colors=" + maxColors + "[p];[s1][p]paletteuse=dither=" + dither
+	// Join the prelude (fps, scale) to the palette split chain with a comma.
+	// Forgetting it fuses "flags=lanczos" + "split" into "flags=lanczossplit",
+	// which ffmpeg rejects as an unknown sws_flags constant.
+	filter := filterPrefix + ",split[s0][s1];[s0]palettegen=max_colors=" + maxColors + "[p];[s1][p]paletteuse=dither=" + dither
 	args := []string{"-an", "-vf", filter}
 	if loop := nonSource(options.GifLoopMode); loop != "" {
 		if loop == "none" {

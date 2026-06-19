@@ -54,8 +54,9 @@ class AppStrings {
   String get removeSourceAudio => isZh ? '去除源视频音轨' : 'Remove source audio';
   String get importedFileList => isZh ? '已导入的文件列表' : 'Imported files';
   String get mergeValidationTitle => isZh ? '无法执行合并' : 'Cannot merge';
-  String get mergeNeedsOneVideoOneAudio =>
-      isZh ? '需要且只能包含 1 个视频文件和 1 个音频文件。' : 'Add exactly one video file and one audio file.';
+  String get mergeNeedsOneVideoOneAudio => isZh
+      ? '需要且只能包含 1 个视频文件和 1 个音频文件。'
+      : 'Add exactly one video file and one audio file.';
   String get removeFromList => isZh ? '从列表移除' : 'Remove from list';
   String get openFile => isZh ? '默认应用打开' : 'Open';
   String get sourceFile => isZh ? '源文件' : 'Source';

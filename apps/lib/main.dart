@@ -21,20 +21,54 @@ void main() {
   runApp(const ProviderScope(child: FormatConvApp()));
 }
 
-class FormatConvApp extends ConsumerWidget {
+class FormatConvApp extends ConsumerStatefulWidget {
   const FormatConvApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FormatConvApp> createState() => _FormatConvAppState();
+}
+
+class _FormatConvAppState extends ConsumerState<FormatConvApp> {
+  // Cache the MaterialApp so a non-theme settings change (e.g. picking a new
+  // default output directory) does not rebuild the whole subtree with a fresh
+  // ThemeData. ThemeData has no equality, so an unconditional rebuild makes
+  // MaterialApp's AnimatedTheme think the theme changed and tears down/rebuilds
+  // every mounted widget — which races native picker modal teardown and can
+  // crash the engine. We only rebuild when the theme-relevant fingerprint
+  // actually changes.
+  String? _cachedFingerprint;
+  MaterialApp? _cachedApp;
+
+  String _themeFingerprint(AppSettings settings) {
+    return '${settings.theme.name}|${settings.effectiveThemeJson}|'
+        '${settings.cardRadius}|${settings.fontFamily}|${settings.language.name}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(versionProvider);
     final settings = ref.watch(settingsProvider).settings;
     final strings = AppStrings(settings.language);
-    return MaterialApp(
-      title: strings.appTitle,
-      debugShowCheckedModeBanner: false,
-      theme: _buildTheme(settings),
-      home: const HomeScreen(),
-    );
+
+    final fingerprint = _themeFingerprint(settings);
+    if (_cachedApp == null || fingerprint != _cachedFingerprint) {
+      _cachedFingerprint = fingerprint;
+      _cachedApp = MaterialApp(
+        title: strings.appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: _buildTheme(settings),
+        // Force MiSans as the default text font for the entire tree, including
+        // overlays (dialogs, tooltips, dropdowns, snackbars) that don't always
+        // inherit ThemeData.fontFamily. Merging (rather than replacing) keeps
+        // the inherited color/size/decoration while only pinning the family.
+        builder: (context, child) => DefaultTextStyle.merge(
+          style: const TextStyle(fontFamily: 'MiSans'),
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: const HomeScreen(),
+      );
+    }
+    return _cachedApp!;
   }
 
   ThemeData _buildTheme(AppSettings settings) {
@@ -223,7 +257,7 @@ class FormatConvApp extends ConsumerWidget {
         ),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
-        textStyle: TextStyle(color: ink),
+        textStyle: TextStyle(color: ink, fontFamily: 'MiSans'),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: surfaceMuted,

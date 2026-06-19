@@ -45,3 +45,4 @@ third_party/tools/windows/
 # build output
 dist/
 test_files/
+.claude/

@@ -879,7 +879,11 @@ class _VideoPreviewState extends State<_VideoPreview> {
       future: _thumbnail,
       builder: (context, snapshot) {
         final file = snapshot.data;
-        if (file != null && file.existsSync()) {
+        // Guard against rebuilds that arrive after this State is unmounted
+        // (e.g. a theme/settings change rebuilding the tree while a native
+        // picker modal tears down). Don't open a new Image.file handle or
+        // touch the filesystem once we're going away.
+        if (file != null && mounted && file.existsSync()) {
           return Image.file(
             file,
             fit: BoxFit.cover,
@@ -902,7 +906,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
       final cacheKey =
           '${widget.filePath.hashCode.abs()}_${stat.modified.millisecondsSinceEpoch}';
       final output = File(p.join(cacheDir.path, '$cacheKey.jpg'));
-      if (output.existsSync()) return output;
+      if (output.existsSync()) return mounted ? output : null;
 
       final ffmpeg = _resolveFfmpegExecutable();
       final result = await Process.run(
@@ -921,7 +925,11 @@ class _VideoPreviewState extends State<_VideoPreview> {
         ],
         runInShell: false,
       );
-      if (result.exitCode == 0 && output.existsSync()) return output;
+      // Drop the result if the widget was unmounted while ffmpeg ran, so the
+      // FutureBuilder never re-opens the file handle on a dead State.
+      if (result.exitCode == 0 && mounted && output.existsSync()) {
+        return output;
+      }
     } catch (_) {}
     return null;
   }
@@ -1701,7 +1709,8 @@ class _MediaOperationRowState extends State<_MediaOperationRow> {
   void _addMergeFiles(List<String> files) {
     final accepted = files
         .where((file) =>
-            _fileType(file) == _FileTab.video || _fileType(file) == _FileTab.audio)
+            _fileType(file) == _FileTab.video ||
+            _fileType(file) == _FileTab.audio)
         .where((file) => !_mergeFiles.contains(file))
         .toList();
     if (accepted.isEmpty) return;
@@ -1727,8 +1736,12 @@ class _MediaOperationRowState extends State<_MediaOperationRow> {
   }
 
   bool _mergeListIsValid() {
-    return _mergeFiles.where((file) => _fileType(file) == _FileTab.video).length == 1 &&
-        _mergeFiles.where((file) => _fileType(file) == _FileTab.audio).length == 1;
+    return _mergeFiles
+                .where((file) => _fileType(file) == _FileTab.video)
+                .length ==
+            1 &&
+        _mergeFiles.where((file) => _fileType(file) == _FileTab.audio).length ==
+            1;
   }
 
   Future<void> _runMergeFromList() async {
@@ -1771,7 +1784,8 @@ class _MediaOperationRowState extends State<_MediaOperationRow> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('${widget.strings.formatSettings} - ${widget.strings.splitAudioVideo}'),
+          title: Text(
+              '${widget.strings.formatSettings} - ${widget.strings.splitAudioVideo}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1815,7 +1829,8 @@ class _MediaOperationRowState extends State<_MediaOperationRow> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('${widget.strings.formatSettings} - ${widget.strings.mergeAudioVideo}'),
+          title: Text(
+              '${widget.strings.formatSettings} - ${widget.strings.mergeAudioVideo}'),
           content: SizedBox(
             width: 320,
             child: Column(
@@ -1828,8 +1843,7 @@ class _MediaOperationRowState extends State<_MediaOperationRow> {
                     setState(() => _autoMerge = value);
                     setDialogState(() {});
                     if (value) {
-                      WidgetsBinding.instance
-                          .addPostFrameCallback((_) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
                         _tryAutoMerge();
                       });
                     }
@@ -1904,15 +1918,16 @@ class _MediaOperationCardState extends State<_MediaOperationCard> {
   @override
   Widget build(BuildContext context) {
     return DragTarget<List<String>>(
-      onWillAcceptWithDetails: (details) => details.data.any(
-          (file) => _fileType(file) == _FileTab.video || _isGifFile(file)),
+      onWillAcceptWithDetails: (details) => details.data
+          .any((file) => _fileType(file) == _FileTab.video || _isGifFile(file)),
       onAcceptWithDetails: (details) => widget.onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
         final active = candidateData.isNotEmpty;
         final rejected = rejectedData.isNotEmpty;
         return MouseRegion(
-          cursor:
-              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.basic,
+          cursor: rejected
+              ? SystemMouseCursors.forbidden
+              : SystemMouseCursors.basic,
           onEnter: (_) => _setHovering(true),
           onExit: (_) => _setHovering(false),
           child: _operationCardShell(
@@ -1983,14 +1998,16 @@ class _MergeOperationCardState extends State<_MergeOperationCard> {
   Widget build(BuildContext context) {
     return DragTarget<List<String>>(
       onWillAcceptWithDetails: (details) => details.data.any((file) =>
-          _fileType(file) == _FileTab.video || _fileType(file) == _FileTab.audio),
+          _fileType(file) == _FileTab.video ||
+          _fileType(file) == _FileTab.audio),
       onAcceptWithDetails: (details) => widget.onAccept(details.data),
       builder: (context, candidateData, rejectedData) {
         final active = candidateData.isNotEmpty;
         final rejected = rejectedData.isNotEmpty;
         return MouseRegion(
-          cursor:
-              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.basic,
+          cursor: rejected
+              ? SystemMouseCursors.forbidden
+              : SystemMouseCursors.basic,
           onEnter: (_) => _setHovering(true),
           onExit: (_) => _setHovering(false),
           child: _operationCardShell(
@@ -2051,8 +2068,8 @@ Widget _operationCardShell({
           : rejected
               ? (dark ? const Color(0xFF3A2022) : const Color(0xFFFFF1F1))
               : hovering
-              ? tokens.hover
-              : tokens.surfaceMuted,
+                  ? tokens.hover
+                  : tokens.surfaceMuted,
       borderRadius: BorderRadius.circular(tokens.cardRadius),
       border: Border.all(
         color: rejected
@@ -4146,7 +4163,11 @@ class _DropdownSetting extends StatelessWidget {
       menuMaxHeight: 240,
       dropdownColor: tokens.surfaceMuted,
       borderRadius: BorderRadius.circular(tokens.cardRadius),
-      style: TextStyle(color: tokens.ink, fontSize: 13),
+      // Pin MiSans on both the field text and the popup menu items. The popup
+      // is rendered in a route overlay, so the MaterialApp.builder
+      // DefaultTextStyle does not reach it; without an explicit family here
+      // the items fall back to the platform default font.
+      style: TextStyle(color: tokens.ink, fontSize: 13, fontFamily: 'MiSans'),
       iconEnabledColor: tokens.ink,
       decoration: InputDecoration(
         labelText: label,
@@ -4169,8 +4190,11 @@ class _DropdownSetting extends StatelessWidget {
       items: [
         ...values.map((value) => DropdownMenuItem(
               value: value,
-              child: Text(displayLabel?.call(value) ??
-                  (value == _sourceOption ? strings.sameAsSource : value)),
+              child: Text(
+                displayLabel?.call(value) ??
+                    (value == _sourceOption ? strings.sameAsSource : value),
+                style: TextStyle(color: tokens.ink, fontFamily: 'MiSans'),
+              ),
             )),
       ],
       onChanged: onChanged,
