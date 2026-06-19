@@ -8,6 +8,7 @@ import '../models/app_settings.dart';
 import '../models/conversion_options.dart';
 import '../models/conversion_result.dart';
 import '../models/conversion_status.dart';
+import '../models/media_operation_options.dart';
 import '../services/conversion_service.dart';
 import '../utils/format_descriptions.dart';
 
@@ -25,6 +26,9 @@ class ConversionTask {
   final bool completed;
   final bool failed;
   final bool cancelled;
+  final String? mode;
+  final String? videoEncoder;
+  final String? probeWarning;
 
   const ConversionTask({
     required this.id,
@@ -36,6 +40,9 @@ class ConversionTask {
     this.completed = false,
     this.failed = false,
     this.cancelled = false,
+    this.mode,
+    this.videoEncoder,
+    this.probeWarning,
   });
 
   ConversionTask copyWith({
@@ -45,6 +52,9 @@ class ConversionTask {
     bool? completed,
     bool? failed,
     bool? cancelled,
+    String? mode,
+    String? videoEncoder,
+    String? probeWarning,
   }) {
     return ConversionTask(
       id: id,
@@ -56,6 +66,9 @@ class ConversionTask {
       completed: completed ?? this.completed,
       failed: failed ?? this.failed,
       cancelled: cancelled ?? this.cancelled,
+      mode: mode ?? this.mode,
+      videoEncoder: videoEncoder ?? this.videoEncoder,
+      probeWarning: probeWarning ?? this.probeWarning,
     );
   }
 }
@@ -374,17 +387,23 @@ class ConversionProvider extends ChangeNotifier {
               conversionStatus =
                   await _service.getConversionStatus(conversionId);
               if (conversionStatus != null) {
-                _currentStatus = conversionStatus;
-                final byteProgress = conversionStatus.totalBytes > 0
-                    ? (conversionStatus.processedBytes /
-                            conversionStatus.totalBytes)
+                final statusSnapshot = conversionStatus;
+                _currentStatus = statusSnapshot;
+                final byteProgress = statusSnapshot.totalBytes > 0
+                    ? (statusSnapshot.processedBytes /
+                            statusSnapshot.totalBytes)
                         .clamp(0.0, 0.95)
                         .toDouble()
-                    : conversionStatus.progress.clamp(0.0, 0.95).toDouble();
+                    : statusSnapshot.progress.clamp(0.0, 0.95).toDouble();
                 _progress = byteProgress;
                 _updateTask(
                   taskKey,
-                  (task) => task.copyWith(progress: byteProgress),
+                  (task) => task.copyWith(
+                    progress: byteProgress,
+                    mode: statusSnapshot.mode,
+                    videoEncoder: statusSnapshot.videoEncoder,
+                    probeWarning: statusSnapshot.probeWarning,
+                  ),
                 );
                 notifyListeners();
               }
@@ -392,6 +411,10 @@ class ConversionProvider extends ChangeNotifier {
                 conversionStatus.status == 'processing');
 
             final failed = conversionStatus?.status != 'completed';
+            final cancelled = conversionStatus?.status == 'cancelled';
+            if (cancelled) {
+              await _deletePartialOutput(file, outputPath);
+            }
             final result = ConversionResult(
               inputPath: file,
               outputPath: outputPath,
@@ -414,7 +437,7 @@ class ConversionProvider extends ChangeNotifier {
                 progress: result.success ? 1 : _progress,
                 completed: true,
                 failed: !result.success,
-                cancelled: conversionStatus?.status == 'cancelled',
+                cancelled: cancelled,
               ),
             );
             notifyListeners();
@@ -445,6 +468,139 @@ class ConversionProvider extends ChangeNotifier {
       }
     } catch (e) {
       _error = _mapBackendError(e.toString());
+    } finally {
+      _isConverting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<ConversionResult?> startMediaOperation(
+    MediaOperationOptions options, {
+    String? displayInputPath,
+    ValueChanged<ConversionResult>? onResult,
+  }) async {
+    if (options.inputs.isEmpty) return null;
+    final startedAt = DateTime.now();
+    final inputPath = displayInputPath ?? options.inputs.first;
+    final taskKey =
+        '${startedAt.microsecondsSinceEpoch}_${options.operation}_${options.inputs.join("|").hashCode}';
+
+    _isConverting = true;
+    _error = null;
+    _conversionTasks[taskKey] = ConversionTask(
+      id: taskKey,
+      inputPath: inputPath,
+      outputPath: options.outputPath,
+      progress: 0,
+      startedAt: startedAt,
+    );
+    notifyListeners();
+
+    try {
+      final conversionId = await _service.runMediaOperation(
+        options,
+        (id, progress, processed, total, status, error) {
+          _progress = progress;
+          final byteProgress = total > 0
+              ? (processed / total).clamp(0.0, 0.95).toDouble()
+              : progress.clamp(0.0, 0.95).toDouble();
+          _updateTask(
+            taskKey,
+            (task) => task.copyWith(progress: byteProgress),
+          );
+          notifyListeners();
+        },
+      );
+      if (conversionId <= 0) {
+        throw Exception('Failed to start media operation.');
+      }
+      _updateTask(
+        taskKey,
+        (task) => task.copyWith(conversionId: conversionId),
+      );
+      notifyListeners();
+
+      ConversionStatus? conversionStatus;
+      try {
+        do {
+          await Future.delayed(const Duration(milliseconds: 100));
+          conversionStatus = await _service.getConversionStatus(conversionId);
+          if (conversionStatus != null) {
+            final statusSnapshot = conversionStatus;
+            _currentStatus = statusSnapshot;
+            final byteProgress = statusSnapshot.totalBytes > 0
+                ? (statusSnapshot.processedBytes / statusSnapshot.totalBytes)
+                    .clamp(0.0, 0.95)
+                    .toDouble()
+                : statusSnapshot.progress.clamp(0.0, 0.95).toDouble();
+            _progress = byteProgress;
+            _updateTask(
+              taskKey,
+              (task) => task.copyWith(
+                outputPath: statusSnapshot.outputPath,
+                progress: byteProgress,
+                mode: statusSnapshot.mode,
+                videoEncoder: statusSnapshot.videoEncoder,
+                probeWarning: statusSnapshot.probeWarning,
+              ),
+            );
+            notifyListeners();
+          }
+        } while (conversionStatus != null &&
+            conversionStatus.status == 'processing');
+      } finally {
+        ConversionService.disposeProgressCallback(conversionId);
+      }
+
+      final failed = conversionStatus?.status != 'completed';
+      final cancelled = conversionStatus?.status == 'cancelled';
+      final outputPath = conversionStatus?.outputPath ?? options.outputPath;
+      if (cancelled) {
+        await _deletePartialOutput(inputPath, outputPath);
+      }
+      final result = ConversionResult(
+        inputPath: inputPath,
+        outputPath: outputPath,
+        success: !failed,
+        startedAt: startedAt,
+        finishedAt: DateTime.now(),
+        error: failed ? _mapBackendError(conversionStatus?.error) : null,
+      );
+      _results[taskKey] = result;
+      if (result.success) {
+        _processedFiles.add(inputPath);
+      }
+      _updateTask(
+        taskKey,
+        (task) => task.copyWith(
+          outputPath: outputPath,
+          progress: result.success ? 1 : _progress,
+          completed: true,
+          failed: !result.success,
+          cancelled: cancelled,
+        ),
+      );
+      notifyListeners();
+      onResult?.call(result);
+      return result;
+    } catch (e) {
+      final result = ConversionResult(
+        inputPath: inputPath,
+        outputPath: options.outputPath,
+        success: false,
+        startedAt: startedAt,
+        finishedAt: DateTime.now(),
+        error: _mapBackendError(e.toString()),
+      );
+      _results[taskKey] = result;
+      _updateTask(
+        taskKey,
+        (task) => task.copyWith(completed: true, failed: true),
+      );
+      _error = result.error;
+      notifyListeners();
+      onResult?.call(result);
+      return result;
     } finally {
       _isConverting = false;
       notifyListeners();
@@ -490,6 +646,9 @@ class ConversionProvider extends ChangeNotifier {
     if (task == null || task.completed || conversionId == null) return;
 
     final cancelled = await _service.cancelConversion(conversionId);
+    if (cancelled) {
+      await _deletePartialOutput(task.inputPath, task.outputPath);
+    }
     _conversionTasks[taskId] = task.copyWith(
       completed: cancelled,
       failed: cancelled,
@@ -499,6 +658,22 @@ class ConversionProvider extends ChangeNotifier {
       _isConverting = _conversionTasks.values.any((item) => !item.completed);
     }
     notifyListeners();
+  }
+
+  Future<void> _deletePartialOutput(String inputPath, String outputPath) async {
+    if (outputPath.trim().isEmpty) return;
+    if (p.normalize(inputPath) == p.normalize(outputPath)) return;
+
+    final file = File(outputPath);
+    for (var attempt = 0; attempt < 12; attempt++) {
+      try {
+        if (!file.existsSync()) return;
+        await file.delete();
+        return;
+      } catch (_) {
+        await Future.delayed(const Duration(milliseconds: 120));
+      }
+    }
   }
 
   String _generateOutputPath(

@@ -1,11 +1,15 @@
 package converter
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +18,11 @@ import (
 )
 
 type FFmpegEngine struct{}
+
+const (
+	probeAttempts = 3
+	probeDelay    = 120 * time.Millisecond
+)
 
 func NewFFmpegEngine() *FFmpegEngine {
 	return &FFmpegEngine{}
@@ -24,6 +33,10 @@ func (e *FFmpegEngine) Convert(ctx context.Context, inputPath, outputPath string
 }
 
 func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64)) error {
+	return e.ConvertWithBytesAndInfo(ctx, inputPath, outputPath, options, progressCallback, byteCallback, nil)
+}
+
+func (e *FFmpegEngine) ConvertWithBytesAndInfo(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64), infoCallback func(models.ConversionExecutionInfo)) error {
 	inputInfo, err := os.Stat(inputPath)
 	if err != nil {
 		return fmt.Errorf("cannot stat input file: %w", err)
@@ -45,22 +58,220 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 		return fmt.Errorf("ffmpeg not found: %w", err)
 	}
 
-	args := e.buildArgs(inputPath, outputPath, options)
+	encoders := map[string]bool{}
+	if options.GPUAcceleration {
+		encoders = e.availableEncoders(ctx, ffmpegPath)
+	}
+	probeInfo := e.probeMediaInfo(ctx, inputPath)
+	command := e.buildCommandWithInfo(inputPath, outputPath, options, true, encoders, probeInfo)
+	if infoCallback != nil {
+		infoCallback(command.executionInfo())
+	}
+	err = e.runFFmpeg(
+		ctx,
+		ffmpegPath,
+		command.Args,
+		outputPath,
+		estimateOutputSize(inputSize, options),
+		progressCallback,
+		byteCallback,
+	)
+	if err == nil || ctx.Err() != nil || !command.UsedHardware {
+		return err
+	}
+
+	gpuErr := err
+	_ = os.Remove(outputPath)
+	cpuCommand := e.buildCommandWithInfo(inputPath, outputPath, options, false, nil, probeInfo)
+	if infoCallback != nil {
+		infoCallback(cpuCommand.executionInfo())
+	}
+	if progressCallback != nil {
+		progressCallback(0)
+	}
+	if byteCallback != nil {
+		byteCallback(0, estimateOutputSize(inputSize, options))
+	}
+	if err := e.runFFmpeg(
+		ctx,
+		ffmpegPath,
+		cpuCommand.Args,
+		outputPath,
+		estimateOutputSize(inputSize, options),
+		progressCallback,
+		byteCallback,
+	); err != nil {
+		return fmt.Errorf("hardware ffmpeg conversion failed: %v; CPU fallback failed: %w", gpuErr, err)
+	}
+	return nil
+}
+
+func (e *FFmpegEngine) RunMediaOperation(ctx context.Context, options models.MediaOperationOptions, progressCallback func(float64), byteCallback func(processed, total int64), infoCallback func(models.ConversionExecutionInfo)) error {
+	ffmpegPath, err := ResolveBinary("ffmpeg")
+	if err != nil {
+		return fmt.Errorf("ffmpeg not found: %w", err)
+	}
+
+	command, inputSize, err := e.buildMediaOperationCommand(ctx, options)
+	if err != nil {
+		return err
+	}
+	if infoCallback != nil {
+		infoCallback(command.executionInfo())
+	}
+	return e.runFFmpeg(ctx, ffmpegPath, command.Args, outputArg(command.Args), inputSize, progressCallback, byteCallback)
+}
+
+func (e *FFmpegEngine) buildMediaOperationCommand(ctx context.Context, options models.MediaOperationOptions) (ffmpegCommand, int64, error) {
+	switch strings.ToLower(options.Operation) {
+	case "split_video":
+		return e.buildSplitVideoCommand(ctx, options)
+	case "split_audio":
+		return e.buildSplitAudioCommand(ctx, options)
+	case "merge":
+		return e.buildMergeCommand(ctx, options)
+	default:
+		return ffmpegCommand{}, 0, fmt.Errorf("unsupported media operation: %s", options.Operation)
+	}
+}
+
+func (e *FFmpegEngine) buildSplitVideoCommand(ctx context.Context, options models.MediaOperationOptions) (ffmpegCommand, int64, error) {
+	if len(options.Inputs) != 1 {
+		return ffmpegCommand{}, 0, fmt.Errorf("split video requires exactly one input file")
+	}
+	inputPath := options.Inputs[0]
+	info := e.probeMediaInfo(ctx, inputPath)
+	if info.Video.Codec == "" {
+		return ffmpegCommand{}, 0, fmt.Errorf("no video stream found for split")
+	}
+	outputPath := options.OutputPath
+	if outputPath == "" {
+		outputPath = derivedOutputPath(inputPath, options.OutputDirectory, "_video", filepath.Ext(inputPath))
+	}
+	outputPath, err := prepareOutputPath(outputPath, options.Overwrite)
+	if err != nil {
+		return ffmpegCommand{}, 0, err
+	}
+	args := []string{"-i", inputPath, "-map", "0:v:0", "-c:v", "copy", "-an"}
+	if options.Overwrite {
+		args = append(args, "-y")
+	}
+	args = append(args, outputPath)
+	return ffmpegCommand{
+		Args:         args,
+		Mode:         "split_video",
+		VideoEncoder: "copy",
+		ProbeWarning: info.ProbeWarning,
+	}, inputSizeOrDefault(inputPath), nil
+}
+
+func (e *FFmpegEngine) buildSplitAudioCommand(ctx context.Context, options models.MediaOperationOptions) (ffmpegCommand, int64, error) {
+	if len(options.Inputs) != 1 {
+		return ffmpegCommand{}, 0, fmt.Errorf("split audio requires exactly one input file")
+	}
+	inputPath := options.Inputs[0]
+	info := e.probeMediaInfo(ctx, inputPath)
+	if info.Audio.Codec == "" {
+		return ffmpegCommand{}, 0, fmt.Errorf("no audio stream found for split")
+	}
+	outputPath := options.OutputPath
+	if outputPath == "" {
+		outputPath = derivedOutputPath(inputPath, options.OutputDirectory, "_audio", audioExtensionForCodec(info.Audio.Codec))
+	}
+	outputPath, err := prepareOutputPath(outputPath, options.Overwrite)
+	if err != nil {
+		return ffmpegCommand{}, 0, err
+	}
+	args := []string{"-i", inputPath, "-map", "0:a:0", "-c:a", "copy", "-vn"}
+	if options.Overwrite {
+		args = append(args, "-y")
+	}
+	args = append(args, outputPath)
+	return ffmpegCommand{
+		Args:         args,
+		Mode:         "split_audio",
+		VideoEncoder: "none",
+		ProbeWarning: info.ProbeWarning,
+	}, inputSizeOrDefault(inputPath), nil
+}
+
+func (e *FFmpegEngine) buildMergeCommand(ctx context.Context, options models.MediaOperationOptions) (ffmpegCommand, int64, error) {
+	videoPath, audioPath, err := classifyMergeInputs(options.Inputs)
+	if err != nil {
+		return ffmpegCommand{}, 0, err
+	}
+	videoInfo := e.probeMediaInfo(ctx, videoPath)
+	audioInfo := e.probeMediaInfo(ctx, audioPath)
+	if videoInfo.Video.Codec == "" {
+		return ffmpegCommand{}, 0, fmt.Errorf("no video stream found in source video")
+	}
+	if audioInfo.Audio.Codec == "" {
+		return ffmpegCommand{}, 0, fmt.Errorf("no audio stream found in source audio")
+	}
+	outputPath := options.OutputPath
+	if outputPath == "" {
+		outputPath = derivedOutputPath(videoPath, options.OutputDirectory, "_merged", filepath.Ext(videoPath))
+	}
+	outputPath, err = prepareOutputPath(outputPath, options.Overwrite)
+	if err != nil {
+		return ffmpegCommand{}, 0, err
+	}
+
+	ext := strings.ToLower(filepath.Ext(videoPath))
+	spec := containerSpecFor(ext)
+	audioCodec := "copy"
+	audioReencoded := false
+	if !codecAllowed(audioInfo.Audio.Codec, spec.AudioCodecs) {
+		audioCodec = spec.DefaultAudioCodec
+		audioReencoded = true
+	}
+
+	keepSourceAudio := !options.RemoveSourceAudio && videoInfo.Audio.Codec != ""
+	args := []string{"-i", videoPath, "-i", audioPath, "-map", "0:v:0"}
+	if keepSourceAudio {
+		args = append(args, "-map", "0:a:0?")
+	}
+	args = append(args, "-map", "1:a:0", "-c:v", "copy")
+	if keepSourceAudio {
+		args = append(args, "-c:a:0", "copy")
+		args = append(args, "-c:a:1", audioCodec)
+	} else {
+		args = append(args, "-c:a", audioCodec)
+	}
+	if duration := e.getDuration(ctx, videoPath); duration > 0 {
+		args = append(args, "-t", strconv.FormatFloat(duration, 'f', 3, 64))
+	} else {
+		args = append(args, "-shortest")
+	}
+	if options.Overwrite {
+		args = append(args, "-y")
+	}
+	args = append(args, outputPath)
+	mode := "merge"
+	if audioReencoded {
+		mode = "merge_audio_encode"
+	}
+	return ffmpegCommand{
+		Args:         args,
+		Mode:         mode,
+		VideoEncoder: "copy",
+		ProbeWarning: strings.TrimSpace(strings.Join([]string{videoInfo.ProbeWarning, audioInfo.ProbeWarning}, " ")),
+	}, inputSizeOrDefault(videoPath), nil
+}
+
+func (e *FFmpegEngine) runFFmpeg(ctx context.Context, ffmpegPath string, args []string, outputPath string, initialExpectedSize int64, progressCallback func(float64), byteCallback func(processed, total int64)) error {
 	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 	configureBackgroundCommand(cmd)
 
-	// Drain stderr in background to prevent pipe blocking
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return fmt.Errorf("cannot create stderr pipe: %w", err)
 	}
+	var stderrBuffer bytes.Buffer
+	stderrDone := make(chan struct{})
 	go func() {
-		buf := make([]byte, 4096)
-		for {
-			if _, err := stderr.Read(buf); err != nil {
-				return
-			}
-		}
+		defer close(stderrDone)
+		_, _ = io.Copy(&stderrBuffer, stderr)
 	}()
 
 	if err := cmd.Start(); err != nil {
@@ -79,7 +290,7 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 	if progressCallback != nil {
 		progressCallback(0.0)
 	}
-	expectedSize := estimateOutputSize(inputSize, options)
+	expectedSize := initialExpectedSize
 	if byteCallback != nil {
 		byteCallback(0, expectedSize)
 	}
@@ -89,7 +300,12 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-done:
+			<-stderrDone
 			if err != nil {
+				details := strings.TrimSpace(stderrBuffer.String())
+				if details != "" {
+					return fmt.Errorf("ffmpeg conversion failed: %w: %s", err, shortenError(details))
+				}
 				return fmt.Errorf("ffmpeg conversion failed: %w", err)
 			}
 			if progressCallback != nil {
@@ -131,52 +347,821 @@ func (e *FFmpegEngine) ConvertWithBytes(ctx context.Context, inputPath, outputPa
 	}
 }
 
-func (e *FFmpegEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {
-	args := []string{}
-	if options.GPUAcceleration {
-		args = append(args, "-hwaccel", "auto")
-	}
-	args = append(args, "-i", inputPath)
+type ffmpegCommand struct {
+	Args         []string
+	UsedHardware bool
+	Mode         string
+	VideoEncoder string
+	ProbeWarning string
+}
 
-	if options.Lossless {
-		ext := strings.ToLower(filepath.Ext(outputPath))
-		switch ext {
-		case ".mp4", ".mkv", ".mov":
-			args = append(args, "-c:v", "ffv1", "-level", "3")
-			args = append(args, "-c:a", "flac")
-		case ".flac":
-			args = append(args, "-c:a", "flac")
-		case ".wav":
-			args = append(args, "-c:a", "pcm_s16le")
-		default:
-			args = append(args, "-c:v", "copy", "-c:a", "copy")
-		}
-	} else {
-		if options.Codec != "" {
-			if isAudioOutput(outputPath) {
-				args = append(args, "-c:a", mapCodecName(options.Codec))
-			} else {
-				args = append(args, "-c:v", mapCodecName(options.Codec))
-			}
-		}
-		if options.Quality > 0 {
-			args = append(args, "-crf", strconv.Itoa(51-options.Quality/2))
-		}
-		if options.Bitrate != "" {
-			if isAudioOutput(outputPath) {
-				args = append(args, "-b:a", options.Bitrate)
-			} else {
-				args = append(args, "-b:v", options.Bitrate)
-			}
-		}
+func (c ffmpegCommand) executionInfo() models.ConversionExecutionInfo {
+	return models.ConversionExecutionInfo{
+		Mode:         c.Mode,
+		VideoEncoder: c.VideoEncoder,
+		ProbeWarning: c.ProbeWarning,
+		OutputPath:   outputArg(c.Args),
 	}
+}
+
+func (e *FFmpegEngine) buildArgs(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, useHardware bool, encoders map[string]bool) ([]string, bool) {
+	command := e.buildCommand(ctx, inputPath, outputPath, options, useHardware, encoders)
+	return command.Args, command.UsedHardware
+}
+
+func (e *FFmpegEngine) buildCommand(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, useHardware bool, encoders map[string]bool) ffmpegCommand {
+	info := e.probeMediaInfo(ctx, inputPath)
+	return e.buildCommandWithInfo(inputPath, outputPath, options, useHardware, encoders, info)
+}
+
+func (e *FFmpegEngine) buildArgsWithInfo(inputPath, outputPath string, options models.ConversionOptions, useHardware bool, encoders map[string]bool, info mediaInfo) ([]string, bool) {
+	command := e.buildCommandWithInfo(inputPath, outputPath, options, useHardware, encoders, info)
+	return command.Args, command.UsedHardware
+}
+
+func (e *FFmpegEngine) buildCommandWithInfo(inputPath, outputPath string, options models.ConversionOptions, useHardware bool, encoders map[string]bool, info mediaInfo) ffmpegCommand {
+	ext := strings.ToLower(filepath.Ext(outputPath))
+	hasProbeInfo := info.Video.Codec != "" || info.Audio.Codec != ""
+	args := []string{}
+	args = append(args, "-i", inputPath)
 
 	if options.Overwrite {
 		args = append(args, "-y")
 	}
 
+	if ext == ".gif" {
+		args = append(args, e.buildGifArgs(options)...)
+		args = append(args, outputPath)
+		return ffmpegCommand{Args: args, Mode: "gif_encode", VideoEncoder: "gif", ProbeWarning: info.ProbeWarning}
+	}
+
+	if isAudioOutput(outputPath) {
+		args = append(args, "-vn")
+		audioCodec := chooseAudioCodecForOutput(ext, info.Audio.Codec, options.AudioCodec)
+		args = append(args, "-c:a", audioCodec)
+		args = appendAudioArgs(args, options)
+		args = append(args, outputPath)
+		return ffmpegCommand{Args: args, Mode: "audio_encode", VideoEncoder: "none", ProbeWarning: info.ProbeWarning}
+	}
+
+	usedHardware := false
+	videoEncoder := "copy"
+	videoReencoded := false
+	audioReencoded := false
+	spec := containerSpecFor(ext)
+	args = append(args, "-map", "0")
+
+	if !hasProbeInfo && !options.ForceVideoReencode && !options.ForceAudioReencode {
+		args = append(args, "-c", "copy", outputPath)
+		return ffmpegCommand{Args: args, Mode: "remux", VideoEncoder: "copy", ProbeWarning: info.ProbeWarning}
+	}
+
+	if info.Video.Codec != "" {
+		if options.ForceVideoReencode || !codecAllowed(info.Video.Codec, spec.VideoCodecs) {
+			codec := chooseCodec(options.VideoCodec, info.Video.Codec, spec.DefaultVideoCodec, spec.VideoCodecs)
+			if options.GPUAcceleration && useHardware {
+				if hardwareCodec, ok := chooseHardwareEncoder(codec, encoders); ok {
+					codec = hardwareCodec
+					usedHardware = true
+				}
+			}
+			args = append(args, "-c:v", codec)
+			videoEncoder = codec
+			videoReencoded = true
+			if options.VideoQuality > 0 && options.VideoQuality < 100 && !usedHardware {
+				args = append(args, "-crf", strconv.Itoa(51-options.VideoQuality/2))
+			} else if options.VideoQuality > 0 && options.VideoQuality < 100 && usedHardware {
+				args = append(args, hardwareQualityArgs(codec, options.VideoQuality)...)
+			}
+			if value := nonSource(options.Resolution); value != "" {
+				args = append(args, "-s", mapResolution(value))
+			}
+			if value := nonSource(options.FrameRate); value != "" {
+				args = append(args, "-r", value)
+			}
+			if value := nonSource(options.VideoBitrate); value != "" {
+				args = append(args, "-b:v", value)
+			}
+		} else {
+			args = append(args, "-c:v", "copy")
+		}
+	} else if options.ForceVideoReencode {
+		codec := chooseCodec(options.VideoCodec, "", spec.DefaultVideoCodec, spec.VideoCodecs)
+		if options.GPUAcceleration && useHardware {
+			if hardwareCodec, ok := chooseHardwareEncoder(codec, encoders); ok {
+				codec = hardwareCodec
+				usedHardware = true
+			}
+		}
+		args = append(args, "-c:v", codec)
+		videoEncoder = codec
+		videoReencoded = true
+	} else if !hasProbeInfo {
+		args = append(args, "-c:v", "copy")
+	}
+
+	if info.Audio.Codec != "" {
+		if options.ForceAudioReencode || !codecAllowed(info.Audio.Codec, spec.AudioCodecs) {
+			codec := chooseCodec(options.AudioCodec, info.Audio.Codec, spec.DefaultAudioCodec, spec.AudioCodecs)
+			args = append(args, "-c:a", codec)
+			args = appendAudioArgs(args, options)
+			audioReencoded = true
+		} else {
+			args = append(args, "-c:a", "copy")
+		}
+	} else if options.ForceAudioReencode {
+		codec := chooseCodec(options.AudioCodec, "", spec.DefaultAudioCodec, spec.AudioCodecs)
+		args = append(args, "-c:a", codec)
+		args = appendAudioArgs(args, options)
+		audioReencoded = true
+	} else if !hasProbeInfo {
+		args = append(args, "-c:a", "copy")
+	}
+
+	if usedHardware {
+		args = append([]string{"-hwaccel", "auto"}, args...)
+	}
+
 	args = append(args, outputPath)
+	mode := "remux"
+	if videoReencoded || audioReencoded {
+		mode = "cpu_encode"
+	}
+	if usedHardware {
+		mode = "gpu_encode"
+	}
+	return ffmpegCommand{
+		Args:         args,
+		UsedHardware: usedHardware,
+		Mode:         mode,
+		VideoEncoder: videoEncoder,
+		ProbeWarning: info.ProbeWarning,
+	}
+}
+
+func (e *FFmpegEngine) buildGifArgs(options models.ConversionOptions) []string {
+	filters := []string{}
+	if fps := gifFrameRate(options); fps != "" {
+		filters = append(filters, "fps="+fps)
+	}
+	if scale := nonSource(options.GifScale); scale != "" {
+		filters = append(filters, "scale="+scale+":flags=lanczos")
+	}
+	maxColors := nonSource(options.GifMaxColors)
+	if maxColors == "" {
+		maxColors = "256"
+	}
+	dither := nonSource(options.GifDitherAlgorithm)
+	if dither == "" {
+		dither = "sierra2_4a"
+	}
+	filterPrefix := strings.Join(filters, ",")
+	if filterPrefix != "" {
+		filterPrefix += ","
+	}
+	filter := filterPrefix + "split[s0][s1];[s0]palettegen=max_colors=" + maxColors + "[p];[s1][p]paletteuse=dither=" + dither
+	args := []string{"-an", "-vf", filter}
+	if loop := nonSource(options.GifLoopMode); loop != "" {
+		if loop == "none" {
+			args = append(args, "-loop", "-1")
+		} else {
+			args = append(args, "-loop", "0")
+		}
+	}
 	return args
+}
+
+func (e *FFmpegEngine) availableEncoders(ctx context.Context, ffmpegPath string) map[string]bool {
+	cmd := exec.CommandContext(ctx, ffmpegPath, "-hide_banner", "-encoders")
+	configureBackgroundCommand(cmd)
+	output, err := cmd.Output()
+	if err != nil {
+		return map[string]bool{}
+	}
+	encoders := map[string]bool{}
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && strings.Contains(fields[0], "V") {
+			encoders[fields[1]] = true
+		}
+	}
+	return encoders
+}
+
+func chooseHardwareEncoder(codec string, encoders map[string]bool) (string, bool) {
+	if len(encoders) == 0 {
+		return "", false
+	}
+	candidates := hardwareEncoderCandidates(codec)
+	for _, candidate := range candidates {
+		if encoders[candidate] {
+			return candidate, true
+		}
+	}
+	return "", false
+}
+
+func hardwareEncoderCandidates(codec string) []string {
+	switch normalizeCodec(codec) {
+	case "h264":
+		return []string{"h264_nvenc", "h264_qsv", "h264_amf"}
+	case "hevc":
+		return []string{"hevc_nvenc", "hevc_qsv", "hevc_amf"}
+	case "av1":
+		return []string{"av1_nvenc", "av1_qsv", "av1_amf"}
+	default:
+		return nil
+	}
+}
+
+func hardwareQualityArgs(codec string, quality int) []string {
+	if quality <= 0 || quality >= 100 {
+		return nil
+	}
+	value := strconv.Itoa(mapHardwareQuality(quality))
+	switch {
+	case strings.HasSuffix(codec, "_nvenc"), strings.HasSuffix(codec, "_qsv"):
+		return []string{"-cq", value}
+	default:
+		return nil
+	}
+}
+
+func mapHardwareQuality(quality int) int {
+	if quality < 1 {
+		quality = 1
+	}
+	if quality > 100 {
+		quality = 100
+	}
+	return 51 - quality/2
+}
+
+func shortenError(message string) string {
+	message = strings.ReplaceAll(message, "\r", "\n")
+	lines := strings.Split(message, "\n")
+	kept := make([]string, 0, 8)
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		kept = append(kept, line)
+		if len(kept) >= 8 {
+			break
+		}
+	}
+	return strings.Join(kept, " | ")
+}
+
+func outputArg(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return args[len(args)-1]
+}
+
+func inputSizeOrDefault(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil || info.Size() <= 0 {
+		return 1
+	}
+	return info.Size()
+}
+
+func prepareOutputPath(outputPath string, overwrite bool) (string, error) {
+	if outputPath == "" {
+		return "", fmt.Errorf("output path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return "", fmt.Errorf("cannot create output directory: %w", err)
+	}
+	if overwrite {
+		return outputPath, nil
+	}
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		return outputPath, nil
+	}
+
+	ext := filepath.Ext(outputPath)
+	base := strings.TrimSuffix(outputPath, ext)
+	for suffix := 1; suffix < 10000; suffix++ {
+		candidate := fmt.Sprintf("%s_%d%s", base, suffix, ext)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("cannot find available output path for: %s", outputPath)
+}
+
+func derivedOutputPath(inputPath, outputDirectory, suffix, ext string) string {
+	if ext == "" {
+		ext = filepath.Ext(inputPath)
+	}
+	dir := outputDirectory
+	if strings.TrimSpace(dir) == "" {
+		dir = filepath.Dir(inputPath)
+	}
+	return filepath.Join(dir, filepath.Base(strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath)))+suffix+ext)
+}
+
+func audioExtensionForCodec(codec string) string {
+	switch normalizeCodec(codec) {
+	case "flac":
+		return ".flac"
+	case "aac":
+		return ".aac"
+	case "mp3":
+		return ".mp3"
+	case "opus":
+		return ".opus"
+	case "vorbis":
+		return ".ogg"
+	case "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le":
+		return ".wav"
+	case "alac":
+		return ".m4a"
+	default:
+		return ".mka"
+	}
+}
+
+func classifyMergeInputs(inputs []string) (string, string, error) {
+	var videoPath string
+	var audioPath string
+	for _, input := range inputs {
+		switch fileTypeByExtension(input) {
+		case "video":
+			if videoPath != "" {
+				return "", "", fmt.Errorf("merge requires exactly one video file")
+			}
+			videoPath = input
+		case "audio":
+			if audioPath != "" {
+				return "", "", fmt.Errorf("merge requires exactly one audio file")
+			}
+			audioPath = input
+		default:
+			return "", "", fmt.Errorf("merge only supports video and audio files: %s", filepath.Base(input))
+		}
+	}
+	if videoPath == "" || audioPath == "" {
+		return "", "", fmt.Errorf("merge requires one video file and one audio file")
+	}
+	return videoPath, audioPath, nil
+}
+
+func fileTypeByExtension(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".mp4", ".mkv", ".mov", ".avi", ".webm", ".flv", ".wmv", ".mpeg", ".mpg", ".3gp":
+		return "video"
+	case ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".opus":
+		return "audio"
+	default:
+		return ""
+	}
+}
+
+type mediaStreamInfo struct {
+	Codec      string
+	Width      int
+	Height     int
+	FrameRate  string
+	BitRate    string
+	SampleRate string
+	Channels   int
+}
+
+type mediaInfo struct {
+	Video         mediaStreamInfo
+	Audio         mediaStreamInfo
+	ProbeSource   string
+	ProbeAttempts int
+	ProbeWarning  string
+}
+
+func (i mediaInfo) hasStreams() bool {
+	return i.Video.Codec != "" || i.Audio.Codec != ""
+}
+
+type ffprobeStream struct {
+	CodecType  string `json:"codec_type"`
+	CodecName  string `json:"codec_name"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	FrameRate  string `json:"r_frame_rate"`
+	BitRate    string `json:"bit_rate"`
+	SampleRate string `json:"sample_rate"`
+	Channels   int    `json:"channels"`
+}
+
+type ffprobeResult struct {
+	Streams []ffprobeStream `json:"streams"`
+}
+
+func (e *FFmpegEngine) probeMediaInfo(ctx context.Context, inputPath string) mediaInfo {
+	failures := []string{}
+	ffprobePath, err := ResolveBinary("ffprobe")
+	if err != nil {
+		failures = append(failures, "ffprobe not found: "+err.Error())
+	} else {
+		for attempt := 1; attempt <= probeAttempts; attempt++ {
+			info, err := e.probeWithFFprobeEntries(ctx, ffprobePath, inputPath)
+			if err == nil && info.hasStreams() {
+				info.ProbeSource = "ffprobe_entries"
+				info.ProbeAttempts = attempt
+				info.ProbeWarning = probeWarning(failures)
+				return info
+			}
+			if err == nil {
+				err = fmt.Errorf("ffprobe returned no video or audio streams")
+			}
+			failures = append(failures, fmt.Sprintf("ffprobe entries attempt %d/%d: %v", attempt, probeAttempts, err))
+			if !sleepBeforeProbeRetry(ctx, attempt) {
+				return mediaInfo{ProbeWarning: probeWarning(failures)}
+			}
+		}
+
+		info, err := e.probeWithFFprobeStreams(ctx, ffprobePath, inputPath)
+		if err == nil && info.hasStreams() {
+			info.ProbeSource = "ffprobe_show_streams"
+			info.ProbeAttempts = probeAttempts + 1
+			info.ProbeWarning = probeWarning(failures)
+			return info
+		}
+		if err == nil {
+			err = fmt.Errorf("ffprobe -show_streams returned no video or audio streams")
+		}
+		failures = append(failures, "ffprobe show_streams fallback: "+err.Error())
+	}
+
+	ffmpegPath, err := ResolveBinary("ffmpeg")
+	if err != nil {
+		failures = append(failures, "ffmpeg not found: "+err.Error())
+		return mediaInfo{ProbeWarning: probeWarning(failures)}
+	}
+	info, err := e.probeWithFFmpegInput(ctx, ffmpegPath, inputPath)
+	if err == nil && info.hasStreams() {
+		info.ProbeSource = "ffmpeg_input_stderr"
+		info.ProbeAttempts = probeAttempts + 2
+		info.ProbeWarning = probeWarning(failures)
+		return info
+	}
+	if err == nil {
+		err = fmt.Errorf("ffmpeg input fallback returned no video or audio streams")
+	}
+	failures = append(failures, "ffmpeg input fallback: "+err.Error())
+	return mediaInfo{ProbeWarning: probeWarning(failures)}
+}
+
+func (e *FFmpegEngine) probeWithFFprobeEntries(ctx context.Context, ffprobePath, inputPath string) (mediaInfo, error) {
+	return runFFprobeJSON(ctx, ffprobePath, inputPath,
+		"-v", "error",
+		"-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,bit_rate,sample_rate,channels",
+		"-of", "json",
+	)
+}
+
+func (e *FFmpegEngine) probeWithFFprobeStreams(ctx context.Context, ffprobePath, inputPath string) (mediaInfo, error) {
+	return runFFprobeJSON(ctx, ffprobePath, inputPath,
+		"-v", "error",
+		"-show_streams",
+		"-of", "json",
+	)
+}
+
+func runFFprobeJSON(ctx context.Context, ffprobePath, inputPath string, args ...string) (mediaInfo, error) {
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	fullArgs := append([]string{}, args...)
+	fullArgs = append(fullArgs, inputPath)
+	cmd := exec.CommandContext(probeCtx, ffprobePath, fullArgs...)
+	configureBackgroundCommand(cmd)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, err := cmd.Output()
+	if probeCtx.Err() == context.DeadlineExceeded {
+		return mediaInfo{}, fmt.Errorf("probe timed out")
+	}
+	if err != nil {
+		details := strings.TrimSpace(stderr.String())
+		if details != "" {
+			return mediaInfo{}, fmt.Errorf("%w: %s", err, shortenError(details))
+		}
+		return mediaInfo{}, err
+	}
+	var result ffprobeResult
+	if err := json.Unmarshal(output, &result); err != nil {
+		return mediaInfo{}, fmt.Errorf("cannot parse ffprobe json: %w", err)
+	}
+	return mediaInfoFromProbeResult(result), nil
+}
+
+func mediaInfoFromProbeResult(result ffprobeResult) mediaInfo {
+	info := mediaInfo{}
+	for _, stream := range result.Streams {
+		switch stream.CodecType {
+		case "video":
+			if info.Video.Codec == "" {
+				info.Video = mediaStreamInfo{
+					Codec:     stream.CodecName,
+					Width:     stream.Width,
+					Height:    stream.Height,
+					FrameRate: stream.FrameRate,
+					BitRate:   stream.BitRate,
+				}
+			}
+		case "audio":
+			if info.Audio.Codec == "" {
+				info.Audio = mediaStreamInfo{
+					Codec:      stream.CodecName,
+					BitRate:    stream.BitRate,
+					SampleRate: stream.SampleRate,
+					Channels:   stream.Channels,
+				}
+			}
+		}
+	}
+	return info
+}
+
+func (e *FFmpegEngine) probeWithFFmpegInput(ctx context.Context, ffmpegPath, inputPath string) (mediaInfo, error) {
+	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(probeCtx, ffmpegPath, "-hide_banner", "-i", inputPath)
+	configureBackgroundCommand(cmd)
+	output, err := cmd.CombinedOutput()
+	if probeCtx.Err() == context.DeadlineExceeded {
+		return mediaInfo{}, fmt.Errorf("ffmpeg input probe timed out")
+	}
+	text := string(output)
+	info := parseFFmpegInputProbe(text)
+	if info.hasStreams() {
+		return info, nil
+	}
+	if err != nil {
+		return mediaInfo{}, fmt.Errorf("%w: %s", err, shortenError(text))
+	}
+	return mediaInfo{}, fmt.Errorf("no stream lines in ffmpeg input output")
+}
+
+func parseFFmpegInputProbe(output string) mediaInfo {
+	info := mediaInfo{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.Contains(line, "Video:") && info.Video.Codec == "":
+			info.Video = parseVideoStreamLine(line)
+		case strings.Contains(line, "Audio:") && info.Audio.Codec == "":
+			info.Audio = parseAudioStreamLine(line)
+		}
+	}
+	return info
+}
+
+func parseVideoStreamLine(line string) mediaStreamInfo {
+	stream := mediaStreamInfo{Codec: codecAfterLabel(line, "Video:")}
+	if match := regexp.MustCompile(`\b(\d{2,5})x(\d{2,5})\b`).FindStringSubmatch(line); len(match) == 3 {
+		stream.Width, _ = strconv.Atoi(match[1])
+		stream.Height, _ = strconv.Atoi(match[2])
+	}
+	if match := regexp.MustCompile(`\b([0-9]+(?:\.[0-9]+)?)\s*fps\b`).FindStringSubmatch(line); len(match) == 2 {
+		stream.FrameRate = match[1]
+	}
+	if match := regexp.MustCompile(`\b([0-9]+)\s*kb/s\b`).FindStringSubmatch(line); len(match) == 2 {
+		stream.BitRate = match[1] + "k"
+	}
+	return stream
+}
+
+func parseAudioStreamLine(line string) mediaStreamInfo {
+	stream := mediaStreamInfo{Codec: codecAfterLabel(line, "Audio:")}
+	if match := regexp.MustCompile(`\b([0-9]+)\s*Hz\b`).FindStringSubmatch(line); len(match) == 2 {
+		stream.SampleRate = match[1]
+	}
+	stream.Channels = parseChannelCount(line)
+	if match := regexp.MustCompile(`\b([0-9]+)\s*kb/s\b`).FindStringSubmatch(line); len(match) == 2 {
+		stream.BitRate = match[1] + "k"
+	}
+	return stream
+}
+
+func codecAfterLabel(line, label string) string {
+	idx := strings.Index(line, label)
+	if idx < 0 {
+		return ""
+	}
+	rest := strings.TrimSpace(line[idx+len(label):])
+	if comma := strings.Index(rest, ","); comma >= 0 {
+		rest = rest[:comma]
+	}
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.Trim(fields[0], " ,")
+}
+
+func parseChannelCount(line string) int {
+	lower := strings.ToLower(line)
+	switch {
+	case strings.Contains(lower, "7.1"):
+		return 8
+	case strings.Contains(lower, "5.1"):
+		return 6
+	case strings.Contains(lower, "stereo"):
+		return 2
+	case strings.Contains(lower, "mono"):
+		return 1
+	}
+	if match := regexp.MustCompile(`\b([0-9]+)\s*channels?\b`).FindStringSubmatch(lower); len(match) == 2 {
+		channels, _ := strconv.Atoi(match[1])
+		return channels
+	}
+	return 0
+}
+
+func sleepBeforeProbeRetry(ctx context.Context, attempt int) bool {
+	if attempt >= probeAttempts {
+		return true
+	}
+	timer := time.NewTimer(probeDelay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func probeWarning(failures []string) string {
+	if len(failures) == 0 {
+		return ""
+	}
+	return "media probe warnings: " + shortenError(strings.Join(failures, "\n"))
+}
+
+type containerSpec struct {
+	VideoCodecs       []string
+	AudioCodecs       []string
+	DefaultVideoCodec string
+	DefaultAudioCodec string
+}
+
+func containerSpecFor(ext string) containerSpec {
+	switch ext {
+	case ".mp4":
+		return containerSpec{[]string{"h264", "hevc", "h265", "mpeg4", "av1"}, []string{"aac", "mp3", "ac3", "alac"}, "libx264", "aac"}
+	case ".mkv":
+		return containerSpec{[]string{"h264", "hevc", "h265", "mpeg4", "vp8", "vp9", "av1", "ffv1"}, []string{"aac", "mp3", "ac3", "dts", "flac", "opus", "vorbis"}, "libx264", "aac"}
+	case ".mov":
+		return containerSpec{[]string{"h264", "hevc", "h265", "prores"}, []string{"aac", "pcm_s16le"}, "libx264", "aac"}
+	case ".avi":
+		return containerSpec{[]string{"mpeg4", "h264", "msmpeg4v3"}, []string{"mp3", "pcm_s16le", "ac3"}, "mpeg4", "libmp3lame"}
+	case ".webm":
+		return containerSpec{[]string{"vp8", "vp9", "av1"}, []string{"opus", "vorbis"}, "libvpx-vp9", "libopus"}
+	case ".flv":
+		return containerSpec{[]string{"h264", "vp6f", "flv1"}, []string{"aac", "mp3"}, "libx264", "aac"}
+	case ".wmv":
+		return containerSpec{[]string{"wmv3", "wmv2"}, []string{"wmav2"}, "wmv2", "wmav2"}
+	case ".mpeg", ".mpg":
+		return containerSpec{[]string{"mpeg1video", "mpeg2video"}, []string{"mp2", "ac3"}, "mpeg2video", "mp2"}
+	case ".3gp":
+		return containerSpec{[]string{"h263", "h264", "mpeg4"}, []string{"aac", "amr_nb"}, "libx264", "aac"}
+	default:
+		return containerSpec{[]string{"h264"}, []string{"aac"}, "libx264", "aac"}
+	}
+}
+
+func appendAudioArgs(args []string, options models.ConversionOptions) []string {
+	if value := nonSource(options.AudioBitrate); value != "" {
+		args = append(args, "-b:a", value)
+	}
+	if value := nonSource(options.SampleRate); value != "" {
+		args = append(args, "-ar", value)
+	}
+	if value := nonSource(options.Channels); value != "" {
+		args = append(args, "-ac", mapChannels(value))
+	}
+	return args
+}
+
+func chooseAudioCodecForOutput(ext, sourceCodec, selected string) string {
+	spec := audioOutputSpec(ext)
+	return chooseCodec(selected, sourceCodec, spec.DefaultAudioCodec, spec.AudioCodecs)
+}
+
+func audioOutputSpec(ext string) containerSpec {
+	switch ext {
+	case ".mp3":
+		return containerSpec{AudioCodecs: []string{"mp3"}, DefaultAudioCodec: "libmp3lame"}
+	case ".flac":
+		return containerSpec{AudioCodecs: []string{"flac"}, DefaultAudioCodec: "flac"}
+	case ".wav":
+		return containerSpec{AudioCodecs: []string{"pcm_s16le"}, DefaultAudioCodec: "pcm_s16le"}
+	case ".aac":
+		return containerSpec{AudioCodecs: []string{"aac"}, DefaultAudioCodec: "aac"}
+	case ".ogg":
+		return containerSpec{AudioCodecs: []string{"vorbis", "opus"}, DefaultAudioCodec: "libvorbis"}
+	case ".m4a":
+		return containerSpec{AudioCodecs: []string{"aac", "alac"}, DefaultAudioCodec: "aac"}
+	case ".opus":
+		return containerSpec{AudioCodecs: []string{"opus"}, DefaultAudioCodec: "libopus"}
+	default:
+		return containerSpec{AudioCodecs: []string{"aac"}, DefaultAudioCodec: "aac"}
+	}
+}
+
+func chooseCodec(selected, sourceCodec, defaultCodec string, allowed []string) string {
+	if value := nonSource(selected); value != "" {
+		return mapCodecName(value)
+	}
+	if sourceCodec != "" && codecAllowed(sourceCodec, allowed) {
+		return sourceCodec
+	}
+	return defaultCodec
+}
+
+func codecAllowed(codec string, allowed []string) bool {
+	normalized := normalizeCodec(codec)
+	for _, item := range allowed {
+		if normalized == normalizeCodec(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeCodec(codec string) string {
+	codec = strings.ToLower(strings.TrimSpace(codec))
+	codec = strings.TrimPrefix(codec, "lib")
+	switch codec {
+	case "x264":
+		return "h264"
+	case "x265":
+		return "hevc"
+	case "h265":
+		return "hevc"
+	case "mp3lame":
+		return "mp3"
+	case "vorbis":
+		return "vorbis"
+	case "vpx-vp9":
+		return "vp9"
+	case "vpx":
+		return "vp8"
+	case "aom-av1":
+		return "av1"
+	default:
+		return codec
+	}
+}
+
+func nonSource(value string) string {
+	if value == "" || strings.EqualFold(value, "source") {
+		return ""
+	}
+	return value
+}
+
+func mapResolution(value string) string {
+	switch value {
+	case "720p":
+		return "1280x720"
+	case "1080p":
+		return "1920x1080"
+	case "1440p":
+		return "2560x1440"
+	case "2160p":
+		return "3840x2160"
+	default:
+		return value
+	}
+}
+
+func mapChannels(value string) string {
+	switch value {
+	case "mono":
+		return "1"
+	case "stereo":
+		return "2"
+	case "5.1":
+		return "6"
+	case "7.1":
+		return "8"
+	default:
+		return value
+	}
+}
+
+func gifFrameRate(options models.ConversionOptions) string {
+	if options.GifFrameRate == "custom" {
+		return strings.TrimSpace(options.GifFrameRateCustom)
+	}
+	return nonSource(options.GifFrameRate)
 }
 
 func isAudioOutput(outputPath string) bool {
@@ -244,13 +1229,20 @@ func estimateOutputSize(inputSize int64, options models.ConversionOptions) int64
 	if inputSize <= 0 {
 		return 1
 	}
-	if options.Lossless || options.Quality >= 100 {
+	quality := options.Quality
+	if options.VideoQuality > 0 && options.VideoQuality < quality {
+		quality = options.VideoQuality
+	}
+	if options.AudioQuality > 0 && options.AudioQuality < quality {
+		quality = options.AudioQuality
+	}
+	if options.Lossless || quality >= 100 {
 		return inputSize
 	}
-	if options.Quality <= 0 {
+	if quality <= 0 {
 		return inputSize
 	}
-	estimated := int64(float64(inputSize) * float64(options.Quality) / 100.0)
+	estimated := int64(float64(inputSize) * float64(quality) / 100.0)
 	if estimated < 1 {
 		return 1
 	}

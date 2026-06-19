@@ -122,7 +122,12 @@ func (e *ImageMagickEngine) ConvertWithBytes(ctx context.Context, inputPath, out
 func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options models.ConversionOptions) []string {
 	args := []string{inputPath}
 
-	if options.Lossless {
+	quality := options.ImageQuality
+	if quality <= 0 {
+		quality = options.Quality
+	}
+
+	if options.Lossless && quality >= 100 {
 		ext := strings.ToLower(filepath.Ext(outputPath))
 		switch ext {
 		case ".png":
@@ -138,7 +143,6 @@ func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options mode
 			args = append(args, "-quality", "100")
 		}
 	} else {
-		quality := options.Quality
 		if quality <= 0 {
 			quality = 85
 		}
@@ -146,6 +150,16 @@ func (e *ImageMagickEngine) buildArgs(inputPath, outputPath string, options mode
 		if options.CompressionAlgorithm != "" {
 			args = append(args, "-compress", options.CompressionAlgorithm)
 		}
+	}
+
+	if options.ImageScalePercent > 0 && options.ImageScalePercent != 100 {
+		args = append(args, "-resize", fmt.Sprintf("%d%%", options.ImageScalePercent))
+	}
+	if colorSpace := nonSource(options.ColorSpace); colorSpace != "" {
+		args = append(args, "-colorspace", colorSpace)
+	}
+	if !options.PreserveMetadata {
+		args = append(args, "-strip")
 	}
 
 	args = append(args, outputPath)

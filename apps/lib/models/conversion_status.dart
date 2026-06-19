@@ -6,6 +6,9 @@ class ConversionStatus {
   final int totalBytes;
   final String? error;
   final String outputPath;
+  final String? mode;
+  final String? videoEncoder;
+  final String? probeWarning;
 
   ConversionStatus({
     required this.conversionId,
@@ -15,6 +18,9 @@ class ConversionStatus {
     this.totalBytes = 0,
     this.error,
     required this.outputPath,
+    this.mode,
+    this.videoEncoder,
+    this.probeWarning,
   });
 
   factory ConversionStatus.fromJson(Map<String, dynamic> json) {
@@ -26,6 +32,9 @@ class ConversionStatus {
       totalBytes: json['total_bytes'] ?? 0,
       error: json['error'],
       outputPath: json['output_path'] ?? '',
+      mode: json['mode'] as String?,
+      videoEncoder: json['video_encoder'] as String?,
+      probeWarning: json['probe_warning'] as String?,
     );
   }
 }

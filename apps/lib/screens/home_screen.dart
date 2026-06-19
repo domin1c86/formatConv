@@ -13,6 +13,7 @@ import '../l10n/app_strings.dart';
 import '../models/app_settings.dart';
 import '../models/conversion_options.dart';
 import '../models/conversion_result.dart';
+import '../models/media_operation_options.dart';
 import '../providers/conversion_provider.dart';
 import '../providers/settings_provider.dart';
 
@@ -21,6 +22,37 @@ enum _FileTab { all, video, audio, image }
 enum _RightTab { formats, results }
 
 enum _SettingsTab { general, preferences, advanced, about }
+
+const _sourceOption = ConversionOptions.source;
+const _audioBitrateOptions = [
+  _sourceOption,
+  '96k',
+  '128k',
+  '192k',
+  '256k',
+  '320k'
+];
+const _sampleRateOptions = [_sourceOption, '44100', '48000', '96000', '192000'];
+const _channelOptions = [_sourceOption, 'mono', 'stereo', '5.1', '7.1'];
+const _videoBitrateOptions = [_sourceOption, '2M', '4M', '8M', '12M', '20M'];
+const _resolutionOptions = [_sourceOption, '720p', '1080p', '1440p', '2160p'];
+const _frameRateOptions = [_sourceOption, '24', '25', '30', '50', '60'];
+const _colorSpaceOptions = [_sourceOption, 'sRGB', 'RGB', 'Gray', 'CMYK'];
+const _gifScaleOptions = [
+  _sourceOption,
+  '320:-1',
+  '480:-1',
+  '720:-1',
+  '1080:-1'
+];
+const _gifColorOptions = [_sourceOption, '64', '128', '256'];
+const _gifDitherOptions = [
+  _sourceOption,
+  'none',
+  'floyd_steinberg',
+  'sierra2_4a'
+];
+const _gifLoopOptions = [_sourceOption, 'infinite', 'none'];
 
 const _videoExtensions = {
   '.mp4',
@@ -105,6 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
                             onFileSelectionChanged: _toggleFileSelection,
+                            onClearSelection: _clearFileSelection,
                             onFileRemoved: _removeFile,
                             onOpenSettings: () =>
                                 _showSettings(settingsController),
@@ -152,6 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             onPageChanged: (page) =>
                                 setState(() => _page = page),
                             onFileSelectionChanged: _toggleFileSelection,
+                            onClearSelection: _clearFileSelection,
                             onFileRemoved: _removeFile,
                             onOpenSettings: () =>
                                 _showSettings(settingsController),
@@ -219,6 +253,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  void _clearFileSelection() {
+    if (_selectedFileCards.isEmpty) return;
+    setState(_selectedFileCards.clear);
+  }
+
   void _removeFile(String filePath) {
     ref.read(conversionProvider).removeFile(filePath);
     setState(() => _selectedFileCards.remove(filePath));
@@ -234,6 +273,7 @@ class _LeftPane extends StatelessWidget {
   final ValueChanged<_FileTab> onFileTabChanged;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onFileSelectionChanged;
+  final VoidCallback onClearSelection;
   final ValueChanged<String> onFileRemoved;
   final VoidCallback onOpenSettings;
 
@@ -246,6 +286,7 @@ class _LeftPane extends StatelessWidget {
     required this.onFileTabChanged,
     required this.onPageChanged,
     required this.onFileSelectionChanged,
+    required this.onClearSelection,
     required this.onFileRemoved,
     required this.onOpenSettings,
   });
@@ -284,6 +325,7 @@ class _LeftPane extends StatelessWidget {
                 onTabChanged: onFileTabChanged,
                 onPageChanged: onPageChanged,
                 onFileSelectionChanged: onFileSelectionChanged,
+                onClearSelection: onClearSelection,
                 onFileRemoved: onFileRemoved,
               ),
             ),
@@ -435,6 +477,7 @@ class _AddedFilesPanel extends StatefulWidget {
   final ValueChanged<_FileTab> onTabChanged;
   final ValueChanged<int> onPageChanged;
   final ValueChanged<String> onFileSelectionChanged;
+  final VoidCallback onClearSelection;
   final ValueChanged<String> onFileRemoved;
 
   const _AddedFilesPanel({
@@ -448,6 +491,7 @@ class _AddedFilesPanel extends StatefulWidget {
     required this.onTabChanged,
     required this.onPageChanged,
     required this.onFileSelectionChanged,
+    required this.onClearSelection,
     required this.onFileRemoved,
   });
 
@@ -530,46 +574,50 @@ class _AddedFilesPanelState extends State<_AddedFilesPanel> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: visible.isEmpty
-                  ? Center(
-                      child: Text(
-                        widget.strings.noFiles,
-                        style: TextStyle(color: tokens.muted),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onClearSelection,
+                child: visible.isEmpty
+                    ? Center(
+                        child: Text(
+                          widget.strings.noFiles,
+                          style: TextStyle(color: tokens.muted),
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth >= 420 ? 3 : 2;
+                          final denseColumns =
+                              (constraints.maxWidth / 112).floor().clamp(3, 6);
+                          return GridView.builder(
+                            itemCount: visible.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: constraints.maxWidth >= 360
+                                  ? denseColumns
+                                  : columns,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 0.82,
+                            ),
+                            itemBuilder: (context, index) {
+                              final file = visible[index];
+                              return _FileCard(
+                                key: ValueKey(file),
+                                strings: widget.strings,
+                                filePath: file,
+                                selected: widget.selectedFiles.contains(file),
+                                processed: widget.processedFiles.contains(file),
+                                selectedFiles: widget.selectedFiles,
+                                onToggleSelected: () =>
+                                    widget.onFileSelectionChanged(file),
+                                onRemove: () => widget.onFileRemoved(file),
+                              );
+                            },
+                          );
+                        },
                       ),
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final columns = constraints.maxWidth >= 420 ? 3 : 2;
-                        final denseColumns =
-                            (constraints.maxWidth / 112).floor().clamp(3, 6);
-                        return GridView.builder(
-                          itemCount: visible.length,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: constraints.maxWidth >= 360
-                                ? denseColumns
-                                : columns,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 0.82,
-                          ),
-                          itemBuilder: (context, index) {
-                            final file = visible[index];
-                            return _FileCard(
-                              key: ValueKey(file),
-                              strings: widget.strings,
-                              filePath: file,
-                              selected: widget.selectedFiles.contains(file),
-                              processed: widget.processedFiles.contains(file),
-                              selectedFiles: widget.selectedFiles,
-                              onToggleSelected: () =>
-                                  widget.onFileSelectionChanged(file),
-                              onRemove: () => widget.onFileRemoved(file),
-                            );
-                          },
-                        );
-                      },
-                    ),
+              ),
             ),
             if (totalPages > 1) ...[
               const SizedBox(height: 10),
@@ -1002,6 +1050,7 @@ class _FormatSelectionState extends State<_FormatSelection> {
           getOptions: _getOptions,
           onOptionsChanged: _setOptions,
           onConvert: _convert,
+          showGifVideoOptions: hasVideo,
         ),
       if (hasAudio)
         _FormatRow(
@@ -1014,6 +1063,7 @@ class _FormatSelectionState extends State<_FormatSelection> {
           getOptions: _getOptions,
           onOptionsChanged: _setOptions,
           onConvert: _convert,
+          showGifVideoOptions: false,
         ),
       if (imageFormats.isNotEmpty)
         _FormatRow(
@@ -1024,6 +1074,15 @@ class _FormatSelectionState extends State<_FormatSelection> {
           getOptions: _getOptions,
           onOptionsChanged: _setOptions,
           onConvert: _convert,
+          showGifVideoOptions: hasVideo,
+        ),
+      if (hasVideo)
+        _MediaOperationRow(
+          strings: widget.strings,
+          selectedFiles: files,
+          provider: widget.provider,
+          settingsController: widget.settingsController,
+          onResult: widget.settingsController.addHistory,
         ),
       if (!hasVideo && !hasAudio && !hasImage && files.isNotEmpty)
         Text(
@@ -1241,6 +1300,10 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
     final displayName = widget.task.outputPath.isNotEmpty
         ? p.basename(widget.task.outputPath)
         : p.basename(widget.task.inputPath);
+    final modeLabel = widget.task.mode == null
+        ? ''
+        : '\n${widget.task.mode}'
+            '${widget.task.videoEncoder == null ? '' : ' / ${widget.task.videoEncoder}'}';
     final elapsedLongEnough =
         DateTime.now().difference(widget.task.startedAt) >=
             const Duration(milliseconds: 1500);
@@ -1265,7 +1328,7 @@ class _ConversionTaskCardState extends State<_ConversionTaskCard> {
         borderRadius: BorderRadius.circular(tokens.cardRadius),
         onTap: canOpen ? () => _openPath(widget.task.outputPath) : null,
         child: Tooltip(
-          message: displayName,
+          message: '$displayName$modeLabel',
           waitDuration: const Duration(milliseconds: 1500),
           child: Container(
             width: cardWidth,
@@ -1436,6 +1499,7 @@ class _FormatRow extends StatelessWidget {
     String format,
     List<String>? files,
   ) onConvert;
+  final bool showGifVideoOptions;
 
   const _FormatRow({
     required this.title,
@@ -1445,6 +1509,7 @@ class _FormatRow extends StatelessWidget {
     required this.getOptions,
     required this.onOptionsChanged,
     required this.onConvert,
+    required this.showGifVideoOptions,
   });
 
   @override
@@ -1480,6 +1545,7 @@ class _FormatRow extends StatelessWidget {
                               onOptionsChanged(format, options),
                           onConvert: (context, files) =>
                               onConvert(context, type, format, files),
+                          showGifVideoOptions: showGifVideoOptions,
                         ),
                       ),
                     )
@@ -1493,6 +1559,624 @@ class _FormatRow extends StatelessWidget {
   }
 }
 
+class _MediaOperationRow extends StatefulWidget {
+  final AppStrings strings;
+  final List<String> selectedFiles;
+  final ConversionProvider provider;
+  final SettingsController settingsController;
+  final ValueChanged<ConversionResult> onResult;
+
+  const _MediaOperationRow({
+    required this.strings,
+    required this.selectedFiles,
+    required this.provider,
+    required this.settingsController,
+    required this.onResult,
+  });
+
+  @override
+  State<_MediaOperationRow> createState() => _MediaOperationRowState();
+}
+
+class _MediaOperationRowState extends State<_MediaOperationRow> {
+  bool _splitVideo = true;
+  bool _splitAudio = true;
+  bool _autoMerge = false;
+  bool _removeSourceAudio = true;
+  bool _autoMergeRunning = false;
+  final List<String> _mergeFiles = [];
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.strings.mediaOperations,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          Scrollbar(
+            controller: _scrollController,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MediaOperationCard(
+                    label: widget.strings.splitAudioVideo,
+                    onAccept: (files) => _runSplit(files),
+                    onTap: () {
+                      _runSplit(null);
+                    },
+                    onSettings: () {
+                      _showSplitSettings(context);
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  _MergeOperationCard(
+                    label: widget.strings.mergeAudioVideo,
+                    onAccept: _addMergeFiles,
+                    onTap: () {
+                      _runMergeFromList();
+                    },
+                    onSettings: () {
+                      _showMergeSettings(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> get _videoFiles => widget.selectedFiles
+      .where((file) => _fileType(file) == _FileTab.video || _isGifFile(file))
+      .toList();
+
+  Future<AppSettings?> _effectiveSettings() async {
+    final currentSettings = widget.settingsController.settings;
+    if (!currentSettings.askBeforeConvert) return currentSettings;
+    final selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    if (selectedDirectory == null || selectedDirectory.isEmpty) {
+      return null;
+    }
+    return currentSettings.copyWith(defaultOutputDirectory: selectedDirectory);
+  }
+
+  Future<void> _runSplit(List<String>? files) async {
+    final targets = (files ?? _videoFiles)
+        .where((file) => _fileType(file) == _FileTab.video || _isGifFile(file))
+        .toList();
+    if (targets.isEmpty) return;
+    final settings = await _effectiveSettings();
+    if (settings == null) return;
+
+    for (final file in targets) {
+      if (_splitVideo) {
+        await widget.provider.startMediaOperation(
+          MediaOperationOptions(
+            operation: 'split_video',
+            splitVideo: true,
+            inputs: [file],
+            outputDirectory: settings.defaultOutputDirectory,
+            overwrite: settings.overwriteSource,
+          ),
+          displayInputPath: file,
+          onResult: widget.onResult,
+        );
+      }
+      if (_splitAudio) {
+        await widget.provider.startMediaOperation(
+          MediaOperationOptions(
+            operation: 'split_audio',
+            splitAudio: true,
+            inputs: [file],
+            outputDirectory: settings.defaultOutputDirectory,
+            overwrite: settings.overwriteSource,
+          ),
+          displayInputPath: file,
+          onResult: widget.onResult,
+        );
+      }
+    }
+  }
+
+  void _addMergeFiles(List<String> files) {
+    final accepted = files
+        .where((file) =>
+            _fileType(file) == _FileTab.video || _fileType(file) == _FileTab.audio)
+        .where((file) => !_mergeFiles.contains(file))
+        .toList();
+    if (accepted.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _mergeFiles.addAll(accepted));
+      if (_autoMerge) {
+        _tryAutoMerge();
+      }
+    });
+  }
+
+  Future<void> _tryAutoMerge() async {
+    if (_autoMergeRunning) return;
+    if (!_mergeListIsValid()) return;
+    _autoMergeRunning = true;
+    try {
+      await _runMergeFromList();
+    } finally {
+      _autoMergeRunning = false;
+    }
+  }
+
+  bool _mergeListIsValid() {
+    return _mergeFiles.where((file) => _fileType(file) == _FileTab.video).length == 1 &&
+        _mergeFiles.where((file) => _fileType(file) == _FileTab.audio).length == 1;
+  }
+
+  Future<void> _runMergeFromList() async {
+    if (!_mergeListIsValid()) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(widget.strings.mergeValidationTitle),
+          content: Text(widget.strings.mergeNeedsOneVideoOneAudio),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(widget.strings.confirm),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    final settings = await _effectiveSettings();
+    if (settings == null) return;
+    final videoFile =
+        _mergeFiles.firstWhere((file) => _fileType(file) == _FileTab.video);
+    await widget.provider.startMediaOperation(
+      MediaOperationOptions(
+        operation: 'merge',
+        removeSourceAudio: _removeSourceAudio,
+        autoMerge: _autoMerge,
+        inputs: List.unmodifiable(_mergeFiles),
+        outputDirectory: settings.defaultOutputDirectory,
+        overwrite: settings.overwriteSource,
+      ),
+      displayInputPath: videoFile,
+      onResult: widget.onResult,
+    );
+  }
+
+  Future<void> _showSplitSettings(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('${widget.strings.formatSettings} - ${widget.strings.splitAudioVideo}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckboxListTile(
+                value: _splitVideo,
+                title: Text(widget.strings.splitVideoTrack),
+                onChanged: (value) {
+                  setState(() {
+                    _splitVideo = value ?? true;
+                    if (!_splitVideo && !_splitAudio) _splitAudio = true;
+                  });
+                  setDialogState(() {});
+                },
+              ),
+              CheckboxListTile(
+                value: _splitAudio,
+                title: Text(widget.strings.splitAudioTrack),
+                onChanged: (value) {
+                  setState(() {
+                    _splitAudio = value ?? true;
+                    if (!_splitVideo && !_splitAudio) _splitVideo = true;
+                  });
+                  setDialogState(() {});
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(widget.strings.save),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMergeSettings(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('${widget.strings.formatSettings} - ${widget.strings.mergeAudioVideo}'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  value: _autoMerge,
+                  title: Text(widget.strings.autoMerge),
+                  onChanged: (value) {
+                    setState(() => _autoMerge = value);
+                    setDialogState(() {});
+                    if (value) {
+                      WidgetsBinding.instance
+                          .addPostFrameCallback((_) {
+                        _tryAutoMerge();
+                      });
+                    }
+                  },
+                ),
+                SwitchListTile(
+                  value: _removeSourceAudio,
+                  title: Text(widget.strings.removeSourceAudio),
+                  onChanged: (value) {
+                    setState(() => _removeSourceAudio = value);
+                    setDialogState(() {});
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.strings.importedFileList,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _MergeFileList(
+                  files: _mergeFiles,
+                  strings: widget.strings,
+                  onRemove: (file) {
+                    setState(() => _mergeFiles.remove(file));
+                    setDialogState(() {});
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(widget.strings.save),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaOperationCard extends StatefulWidget {
+  final String label;
+  final ValueChanged<List<String>> onAccept;
+  final VoidCallback onTap;
+  final VoidCallback onSettings;
+
+  const _MediaOperationCard({
+    required this.label,
+    required this.onAccept,
+    required this.onTap,
+    required this.onSettings,
+  });
+
+  @override
+  State<_MediaOperationCard> createState() => _MediaOperationCardState();
+}
+
+class _MediaOperationCardState extends State<_MediaOperationCard> {
+  bool _hovering = false;
+
+  void _setHovering(bool value) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hovering == value) return;
+      setState(() => _hovering = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<List<String>>(
+      onWillAcceptWithDetails: (details) => details.data.any(
+          (file) => _fileType(file) == _FileTab.video || _isGifFile(file)),
+      onAcceptWithDetails: (details) => widget.onAccept(details.data),
+      builder: (context, candidateData, rejectedData) {
+        final tokens = _themeTokens(context);
+        final active = candidateData.isNotEmpty;
+        final rejected = rejectedData.isNotEmpty;
+        return MouseRegion(
+          cursor:
+              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+          onEnter: (_) => _setHovering(true),
+          onExit: (_) => _setHovering(false),
+          child: _operationCardShell(
+            context: context,
+            active: active,
+            rejected: rejected,
+            hovering: _hovering,
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    hoverColor: Colors.transparent,
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    borderRadius: BorderRadius.circular(tokens.cardRadius),
+                    onTap: widget.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.settings_outlined, size: 16),
+                  onPressed: widget.onSettings,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MergeOperationCard extends StatefulWidget {
+  final String label;
+  final ValueChanged<List<String>> onAccept;
+  final VoidCallback onTap;
+  final VoidCallback onSettings;
+
+  const _MergeOperationCard({
+    required this.label,
+    required this.onAccept,
+    required this.onTap,
+    required this.onSettings,
+  });
+
+  @override
+  State<_MergeOperationCard> createState() => _MergeOperationCardState();
+}
+
+class _MergeOperationCardState extends State<_MergeOperationCard> {
+  bool _hovering = false;
+
+  void _setHovering(bool value) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hovering == value) return;
+      setState(() => _hovering = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<List<String>>(
+      onWillAcceptWithDetails: (details) => details.data.any((file) =>
+          _fileType(file) == _FileTab.video || _fileType(file) == _FileTab.audio),
+      onAcceptWithDetails: (details) => widget.onAccept(details.data),
+      builder: (context, candidateData, rejectedData) {
+        final tokens = _themeTokens(context);
+        final active = candidateData.isNotEmpty;
+        final rejected = rejectedData.isNotEmpty;
+        return MouseRegion(
+          cursor:
+              rejected ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+          onEnter: (_) => _setHovering(true),
+          onExit: (_) => _setHovering(false),
+          child: _operationCardShell(
+            context: context,
+            active: active,
+            rejected: rejected,
+            hovering: _hovering,
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    hoverColor: Colors.transparent,
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    borderRadius: BorderRadius.circular(tokens.cardRadius),
+                    onTap: widget.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.label,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.settings_outlined, size: 16),
+                  onPressed: widget.onSettings,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+Widget _operationCardShell({
+  required BuildContext context,
+  required bool active,
+  required bool rejected,
+  required bool hovering,
+  required Widget child,
+  double width = 156,
+  double height = 54,
+}) {
+  final tokens = _themeTokens(context);
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return AnimatedContainer(
+    duration: const Duration(milliseconds: 140),
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: active
+          ? tokens.primary.withValues(alpha: 0.10)
+          : rejected
+              ? (dark ? const Color(0xFF3A2022) : const Color(0xFFFFF1F1))
+              : hovering
+              ? tokens.hover
+              : tokens.surfaceMuted,
+      borderRadius: BorderRadius.circular(tokens.cardRadius),
+      border: Border.all(
+        color: rejected
+            ? const Color(0xFFE5484D)
+            : active || hovering
+                ? tokens.primary
+                : tokens.border,
+        width: active ? 2 : 1,
+      ),
+    ),
+    child: child,
+  );
+}
+
+class _MergeFileList extends StatefulWidget {
+  final List<String> files;
+  final AppStrings strings;
+  final ValueChanged<String> onRemove;
+
+  const _MergeFileList({
+    required this.files,
+    required this.strings,
+    required this.onRemove,
+  });
+
+  @override
+  State<_MergeFileList> createState() => _MergeFileListState();
+}
+
+class _MergeFileListState extends State<_MergeFileList> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    if (widget.files.isEmpty) {
+      return SizedBox(
+        width: double.infinity,
+        height: 28,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            widget.strings.importedFileList,
+            style: TextStyle(color: tokens.muted, fontSize: 12),
+          ),
+        ),
+      );
+    }
+    final visibleItemCount = math.min(widget.files.length, 5);
+    return SizedBox(
+      width: double.infinity,
+      height: visibleItemCount * 28.0,
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: widget.files.length > 5,
+        child: ListView.builder(
+          controller: _controller,
+          itemExtent: 28,
+          itemCount: widget.files.length,
+          itemBuilder: (context, index) {
+            final file = widget.files[index];
+            return Row(
+              children: [
+                Tooltip(
+                  message: widget.strings.removeFromList,
+                  child: InkWell(
+                    mouseCursor: SystemMouseCursors.click,
+                    onTap: () => widget.onRemove(file),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: SvgPicture.asset(
+                        'windows/runner/resources/cancel.svg',
+                        width: 14,
+                        height: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Tooltip(
+                    waitDuration: const Duration(milliseconds: 500),
+                    message: p.basename(file),
+                    child: Text(
+                      _middleEllipsis(p.basename(file)),
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: TextStyle(color: tokens.ink, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _MiniFormatCard extends StatefulWidget {
   final AppStrings strings;
   final _FileTab type;
@@ -1500,6 +2184,7 @@ class _MiniFormatCard extends StatefulWidget {
   final ConversionOptions options;
   final ValueChanged<ConversionOptions> onOptionsChanged;
   final void Function(BuildContext context, List<String>? files) onConvert;
+  final bool showGifVideoOptions;
 
   const _MiniFormatCard({
     required this.strings,
@@ -1508,6 +2193,7 @@ class _MiniFormatCard extends StatefulWidget {
     required this.options,
     required this.onOptionsChanged,
     required this.onConvert,
+    required this.showGifVideoOptions,
   });
 
   @override
@@ -1609,6 +2295,7 @@ class _MiniFormatCardState extends State<_MiniFormatCard> {
         format: widget.format,
         options: widget.options,
         onChanged: widget.onOptionsChanged,
+        showGifVideoOptions: widget.showGifVideoOptions,
       ),
     );
   }
@@ -1620,6 +2307,7 @@ class _FormatSettingsDialog extends StatefulWidget {
   final String format;
   final ConversionOptions options;
   final ValueChanged<ConversionOptions> onChanged;
+  final bool showGifVideoOptions;
 
   const _FormatSettingsDialog({
     required this.strings,
@@ -1627,6 +2315,7 @@ class _FormatSettingsDialog extends StatefulWidget {
     required this.format,
     required this.options,
     required this.onChanged,
+    required this.showGifVideoOptions,
   });
 
   @override
@@ -1638,46 +2327,7 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final codecs = _codecsFor(widget.format, widget.type);
-    final bitrates = widget.type == _FileTab.audio
-        ? const ['96k', '128k', '192k', '256k', '320k']
-        : const <String>[];
-    final algorithms = widget.type == _FileTab.image && _options.quality < 100
-        ? const ['LZW', 'Zip', 'JPEG', 'WebP', 'RLE']
-        : const <String>[];
-    final fields = <Widget>[
-      _SliderSetting(
-        label: widget.strings.compressionRatio,
-        value: _options.quality,
-        onChanged: (value) =>
-            _update(_options.copyWith(quality: value, lossless: value >= 100)),
-      ),
-      if (bitrates.isNotEmpty)
-        _DropdownSetting(
-          label: widget.strings.bitrate,
-          value: _options.bitrate,
-          values: bitrates,
-          strings: widget.strings,
-          onChanged: (value) => _update(_options.copyWith(bitrate: value)),
-        ),
-      if (codecs.isNotEmpty)
-        _DropdownSetting(
-          label: widget.strings.codec,
-          value: _options.codec,
-          values: codecs,
-          strings: widget.strings,
-          onChanged: (value) => _update(_options.copyWith(codec: value)),
-        ),
-      if (algorithms.isNotEmpty)
-        _DropdownSetting(
-          label: widget.strings.compressionAlgorithm,
-          value: _options.compressionAlgorithm,
-          values: algorithms,
-          strings: widget.strings,
-          onChanged: (value) =>
-              _update(_options.copyWith(compressionAlgorithm: value)),
-        ),
-    ];
+    final fields = _buildFields(context);
 
     return AlertDialog(
       shape: RoundedRectangleBorder(
@@ -1686,14 +2336,16 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
       ),
       title: Text('${widget.strings.formatSettings} - ${widget.format}'),
       content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: fields
-              .expand((field) => [field, const SizedBox(height: 20)])
-              .take(fields.length * 2 - 1)
-              .toList(),
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: fields
+                .expand((field) => [field, const SizedBox(height: 20)])
+                .take(fields.length * 2 - 1)
+                .toList(),
+          ),
         ),
       ),
       actions: [
@@ -1707,6 +2359,275 @@ class _FormatSettingsDialogState extends State<_FormatSettingsDialog> {
   void _update(ConversionOptions options) {
     setState(() => _options = options);
     widget.onChanged(options);
+  }
+
+  List<Widget> _buildFields(BuildContext context) {
+    if (widget.type == _FileTab.audio) return _audioFields();
+    if (widget.type == _FileTab.image) {
+      final fields =
+          widget.format.toUpperCase() == 'GIF' && widget.showGifVideoOptions
+              ? _gifFields()
+              : _imageFields();
+      return fields;
+    }
+    return _videoFields();
+  }
+
+  List<Widget> _audioFields() => [
+        _SliderSetting(
+          label: widget.strings.compressionRatio,
+          value: _options.audioQuality,
+          onChanged: (value) => _update(
+            _options.copyWith(audioQuality: value, lossless: value >= 100),
+          ),
+        ),
+        _DropdownSetting(
+          label: widget.strings.audioBitrate,
+          value: _options.audioBitrate,
+          values: _audioBitrateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(audioBitrate: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.sampleRate,
+          value: _options.sampleRate,
+          values: _sampleRateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(sampleRate: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.channels,
+          value: _options.channels,
+          values: _channelOptions,
+          strings: widget.strings,
+          displayLabel: _optionLabel,
+          onChanged: (value) =>
+              _update(_options.copyWith(channels: value ?? _sourceOption)),
+        ),
+      ];
+
+  List<Widget> _imageFields() => [
+        _SliderSetting(
+          label: widget.strings.compressionRatio,
+          value: _options.imageQuality,
+          onChanged: (value) => _update(
+            _options.copyWith(
+              imageQuality: value,
+              quality: value,
+              lossless: value >= 100,
+            ),
+          ),
+        ),
+        _PercentInputSetting(
+          label: widget.strings.imageScale,
+          value: _options.imageScalePercent,
+          min: 0,
+          max: 200,
+          onChanged: (value) =>
+              _update(_options.copyWith(imageScalePercent: value)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.colorSpace,
+          value: _options.colorSpace,
+          values: _colorSpaceOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(colorSpace: value ?? _sourceOption)),
+        ),
+        _SwitchSetting(
+          label: widget.strings.preserveMetadata,
+          value: _options.preserveMetadata,
+          onChanged: (value) =>
+              _update(_options.copyWith(preserveMetadata: value)),
+        ),
+      ];
+
+  List<Widget> _videoFields() {
+    final fields = <Widget>[
+      _SwitchSetting(
+        label: widget.strings.forceVideoReencode,
+        value: _options.forceVideoReencode,
+        onChanged: (value) =>
+            _update(_options.copyWith(forceVideoReencode: value)),
+      ),
+    ];
+
+    if (_options.forceVideoReencode) {
+      fields.addAll([
+        _SliderSetting(
+          label: widget.strings.videoCompression,
+          value: _options.videoQuality,
+          onChanged: (value) =>
+              _update(_options.copyWith(videoQuality: value, lossless: false)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.videoCodec,
+          value: _options.videoCodec,
+          values: [_sourceOption, ..._codecsFor(widget.format, _FileTab.video)],
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(videoCodec: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.resolution,
+          value: _options.resolution,
+          values: _resolutionOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(resolution: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.videoBitrate,
+          value: _options.videoBitrate,
+          values: _videoBitrateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(videoBitrate: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.frameRate,
+          value: _options.frameRate,
+          values: _frameRateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(frameRate: value ?? _sourceOption)),
+        ),
+        _ReadOnlySetting(
+          label: widget.strings.aspectRatio,
+          value: _aspectRatioForResolution(_options.resolution),
+        ),
+      ]);
+    }
+
+    fields.add(
+      _SwitchSetting(
+        label: widget.strings.forceAudioReencode,
+        value: _options.forceAudioReencode,
+        onChanged: (value) =>
+            _update(_options.copyWith(forceAudioReencode: value)),
+      ),
+    );
+
+    if (_options.forceAudioReencode) {
+      fields.addAll([
+        _SliderSetting(
+          label: widget.strings.audioCompression,
+          value: _options.audioQuality,
+          onChanged: (value) =>
+              _update(_options.copyWith(audioQuality: value, lossless: false)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.audioCodec,
+          value: _options.audioCodec,
+          values: [_sourceOption, ..._audioCodecsForContainer(widget.format)],
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(audioCodec: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.audioBitrate,
+          value: _options.audioBitrate,
+          values: _audioBitrateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(audioBitrate: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.sampleRate,
+          value: _options.sampleRate,
+          values: _sampleRateOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(sampleRate: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.channels,
+          value: _options.channels,
+          values: _channelOptions,
+          strings: widget.strings,
+          displayLabel: _optionLabel,
+          onChanged: (value) =>
+              _update(_options.copyWith(channels: value ?? _sourceOption)),
+        ),
+      ]);
+    }
+    return fields;
+  }
+
+  List<Widget> _gifFields() => [
+        ..._imageFields(),
+        _DropdownSetting(
+          label: widget.strings.frameRate,
+          value: _options.gifFrameRate,
+          values: const [
+            _sourceOption,
+            '10',
+            '12',
+            '15',
+            '24',
+            '30',
+            '60',
+            'custom'
+          ],
+          strings: widget.strings,
+          displayLabel: _optionLabel,
+          onChanged: (value) =>
+              _update(_options.copyWith(gifFrameRate: value ?? _sourceOption)),
+        ),
+        if (_options.gifFrameRate == 'custom')
+          _TextValueSetting(
+            label: widget.strings.customFrameRate,
+            value: _options.gifFrameRateCustom ?? '',
+            onChanged: (value) =>
+                _update(_options.copyWith(gifFrameRateCustom: value)),
+          ),
+        _DropdownSetting(
+          label: widget.strings.gifScale,
+          value: _options.gifScale,
+          values: _gifScaleOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(gifScale: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.gifMaxColors,
+          value: _options.gifMaxColors,
+          values: _gifColorOptions,
+          strings: widget.strings,
+          onChanged: (value) =>
+              _update(_options.copyWith(gifMaxColors: value ?? _sourceOption)),
+        ),
+        _DropdownSetting(
+          label: widget.strings.gifDitherAlgorithm,
+          value: _options.gifDitherAlgorithm,
+          values: _gifDitherOptions,
+          strings: widget.strings,
+          displayLabel: _optionLabel,
+          onChanged: (value) => _update(
+            _options.copyWith(gifDitherAlgorithm: value ?? _sourceOption),
+          ),
+        ),
+        _DropdownSetting(
+          label: widget.strings.gifLoopMode,
+          value: _options.gifLoopMode,
+          values: _gifLoopOptions,
+          strings: widget.strings,
+          displayLabel: _optionLabel,
+          onChanged: (value) =>
+              _update(_options.copyWith(gifLoopMode: value ?? _sourceOption)),
+        ),
+      ];
+
+  String _optionLabel(String value) {
+    if (value == _sourceOption) return widget.strings.sameAsSource;
+    if (value == 'mono') return widget.strings.mono;
+    if (value == 'stereo') return widget.strings.stereo;
+    if (value == 'infinite') return widget.strings.loopInfinite;
+    if (value == 'none') return widget.strings.none;
+    if (value == 'custom') return widget.strings.custom;
+    return value;
   }
 }
 
@@ -3035,11 +3956,181 @@ class _SliderSetting extends StatelessWidget {
   }
 }
 
+class _PercentInputSetting extends StatefulWidget {
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  const _PercentInputSetting({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  @override
+  State<_PercentInputSetting> createState() => _PercentInputSettingState();
+}
+
+class _PercentInputSettingState extends State<_PercentInputSetting> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.value.toString());
+
+  @override
+  void didUpdateWidget(covariant _PercentInputSetting oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value.toString() != _controller.text) {
+      _controller.text = widget.value.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    final clampedValue = widget.value.clamp(widget.min, widget.max).toInt();
+    return Row(
+      children: [
+        SizedBox(width: 96, child: Text(widget.label)),
+        Expanded(
+          child: Slider(
+            value: clampedValue.toDouble(),
+            min: widget.min.toDouble(),
+            max: widget.max.toDouble(),
+            divisions: widget.max - widget.min,
+            onChanged: (value) => widget.onChanged(value.round()),
+          ),
+        ),
+        SizedBox(
+          width: 72,
+          child: TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.end,
+            style: TextStyle(color: tokens.ink, fontSize: 13),
+            decoration: InputDecoration(
+              suffixText: '%',
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(tokens.cardRadius),
+              ),
+            ),
+            onSubmitted: _commit,
+            onEditingComplete: () => _commit(_controller.text),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _commit(String text) {
+    final parsed = int.tryParse(text.trim());
+    if (parsed == null || parsed < 0) {
+      _controller.text = widget.value.toString();
+      return;
+    }
+    widget.onChanged(parsed);
+  }
+}
+
+class _ReadOnlySetting extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ReadOnlySetting({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return Row(
+      children: [
+        SizedBox(width: 96, child: Text(label)),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: tokens.surfaceMuted,
+              borderRadius: BorderRadius.circular(tokens.cardRadius),
+              border: Border.all(color: tokens.border),
+            ),
+            child: Text(value, style: TextStyle(color: tokens.muted)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TextValueSetting extends StatefulWidget {
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _TextValueSetting({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  State<_TextValueSetting> createState() => _TextValueSettingState();
+}
+
+class _TextValueSettingState extends State<_TextValueSetting> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.value);
+
+  @override
+  void didUpdateWidget(covariant _TextValueSetting oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != _controller.text) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = _themeTokens(context);
+    return TextField(
+      controller: _controller,
+      keyboardType: TextInputType.number,
+      style: TextStyle(color: tokens.ink, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        filled: true,
+        fillColor: tokens.surfaceMuted,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(tokens.cardRadius),
+        ),
+      ),
+      onChanged: widget.onChanged,
+    );
+  }
+}
+
 class _DropdownSetting extends StatelessWidget {
   final String label;
   final String? value;
   final List<String> values;
   final AppStrings strings;
+  final String Function(String value)? displayLabel;
   final ValueChanged<String?> onChanged;
 
   const _DropdownSetting({
@@ -3047,6 +4138,7 @@ class _DropdownSetting extends StatelessWidget {
     required this.value,
     required this.values,
     required this.strings,
+    this.displayLabel,
     required this.onChanged,
   });
 
@@ -3080,12 +4172,11 @@ class _DropdownSetting extends StatelessWidget {
         ),
       ),
       items: [
-        DropdownMenuItem<String>(
-          value: null,
-          child: Text(strings.defaultOption),
-        ),
-        ...values
-            .map((value) => DropdownMenuItem(value: value, child: Text(value))),
+        ...values.map((value) => DropdownMenuItem(
+              value: value,
+              child: Text(displayLabel?.call(value) ??
+                  (value == _sourceOption ? strings.sameAsSource : value)),
+            )),
       ],
       onChanged: onChanged,
     );
@@ -3195,6 +4286,15 @@ List<String> _compatibleFiles(
       .toList();
 }
 
+String _middleEllipsis(String fileName) {
+  final ext = p.extension(fileName);
+  final name = p.basenameWithoutExtension(fileName);
+  if (name.length <= 14) return fileName;
+  final head = name.substring(0, math.min(6, name.length));
+  final tail = name.substring(math.max(0, name.length - 5));
+  return '$head.......$tail$ext';
+}
+
 String _resolveFfmpegExecutable() {
   final exeToolPath =
       p.join(p.dirname(Platform.resolvedExecutable), 'tools', 'ffmpeg.exe');
@@ -3298,6 +4398,10 @@ List<String> _codecsFor(String format, _FileTab type) {
       'MOV' => ['H.264', 'H.265/HEVC', 'ProRes'],
       'AVI' => ['MPEG-4', 'DivX', 'Xvid'],
       'WEBM' => ['VP8', 'VP9', 'AV1'],
+      'FLV' => ['H.264', 'VP6'],
+      'WMV' => ['WMV3', 'WMV9'],
+      'MPEG' => ['MPEG-2', 'MPEG-4'],
+      '3GP' => ['H.263', 'H.264', 'MPEG-4'],
       _ => const <String>[],
     };
   }
@@ -3313,6 +4417,28 @@ List<String> _codecsFor(String format, _FileTab type) {
     };
   }
   return const <String>[];
+}
+
+List<String> _audioCodecsForContainer(String format) {
+  return switch (format.toUpperCase()) {
+    'MP4' => ['aac', 'libmp3lame', 'ac3'],
+    'MKV' => ['aac', 'libopus', 'libvorbis', 'flac', 'ac3'],
+    'MOV' => ['aac', 'pcm_s16le'],
+    'AVI' => ['libmp3lame', 'pcm_s16le', 'ac3'],
+    'WEBM' => ['libopus', 'libvorbis'],
+    'FLV' => ['aac', 'libmp3lame'],
+    'WMV' => ['wmav2'],
+    'MPEG' => ['mp2', 'ac3'],
+    '3GP' => ['aac'],
+    _ => ['aac'],
+  };
+}
+
+String _aspectRatioForResolution(String resolution) {
+  return switch (resolution) {
+    '720p' || '1080p' || '1440p' || '2160p' => '16:9',
+    _ => 'Auto',
+  };
 }
 
 String _formatDuration(Duration duration) {

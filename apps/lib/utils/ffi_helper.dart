@@ -24,6 +24,15 @@ typedef ConvertFileDart = int Function(
   Pointer<Void> callback,
 );
 
+typedef RunMediaOperationNative = Int64 Function(
+  Pointer<Utf8> optionsJSON,
+  Pointer<Void> callback,
+);
+typedef RunMediaOperationDart = int Function(
+  Pointer<Utf8> optionsJSON,
+  Pointer<Void> callback,
+);
+
 typedef GetConversionStatusNative = Pointer<Utf8> Function(Int64 conversionID);
 typedef GetConversionStatusDart = Pointer<Utf8> Function(int conversionID);
 
@@ -60,6 +69,10 @@ class FFIHelper {
 
   static final ConvertFileDart convertFile =
       lib.lookupFunction<ConvertFileNative, ConvertFileDart>('convertFile');
+
+  static final RunMediaOperationDart runMediaOperation =
+      lib.lookupFunction<RunMediaOperationNative, RunMediaOperationDart>(
+          'runMediaOperation');
 
   static final GetConversionStatusDart getConversionStatus =
       lib.lookupFunction<GetConversionStatusNative, GetConversionStatusDart>(

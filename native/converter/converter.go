@@ -40,6 +40,10 @@ type ConversionEngine interface {
 	SupportedFormats() []string
 }
 
+type planningConversionEngine interface {
+	ConvertWithBytesAndInfo(ctx context.Context, inputPath, outputPath string, options models.ConversionOptions, progressCallback func(float64), byteCallback func(processed, total int64), infoCallback func(models.ConversionExecutionInfo)) error
+}
+
 type Converter struct {
 	detector    *FormatDetector
 	ffmpeg      *FFmpegEngine
@@ -92,6 +96,32 @@ func (c *Converter) ConvertFile(inputPath, outputPath string, options models.Con
 	return conversionID, nil
 }
 
+func (c *Converter) RunMediaOperation(options models.MediaOperationOptions, progressCallback func(uintptr, float64, int64, int64, int, string)) (uintptr, error) {
+	if len(options.Inputs) == 0 {
+		return 0, fmt.Errorf("media operation requires input files")
+	}
+	for _, input := range options.Inputs {
+		if _, err := os.Stat(input); os.IsNotExist(err) {
+			return 0, fmt.Errorf("input file does not exist: %s", input)
+		}
+	}
+
+	c.mu.Lock()
+	conversionID := c.nextID
+	c.nextID++
+	status := &models.ConversionStatus{
+		ConversionID: conversionID,
+		Status:       statusToString(StatusPending),
+		OutputPath:   options.OutputPath,
+	}
+	entry := &conversionEntry{status: status}
+	c.conversions[conversionID] = entry
+	c.mu.Unlock()
+
+	go c.executeMediaOperation(conversionID, options, progressCallback, entry)
+	return conversionID, nil
+}
+
 func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, inputFormat *models.FormatInfo, options models.ConversionOptions, progressCallback func(uintptr, float64, int64, int64, int, string), entry *conversionEntry) {
 	ctx, cancel := context.WithCancel(context.Background())
 	entry.mu.Lock()
@@ -133,7 +163,92 @@ func (c *Converter) executeConversion(id uintptr, inputPath, outputPath string, 
 		}
 	}
 
-	err := engine.ConvertWithBytes(ctx, inputPath, outputPath, options, progressFunc, byteFunc)
+	infoFunc := func(info models.ConversionExecutionInfo) {
+		entry.mu.Lock()
+		entry.status.Mode = info.Mode
+		entry.status.VideoEncoder = info.VideoEncoder
+		entry.status.ProbeWarning = info.ProbeWarning
+		if info.OutputPath != "" {
+			entry.status.OutputPath = info.OutputPath
+		}
+		entry.mu.Unlock()
+	}
+
+	var err error
+	if planner, ok := engine.(planningConversionEngine); ok {
+		err = planner.ConvertWithBytesAndInfo(ctx, inputPath, outputPath, options, progressFunc, byteFunc, infoFunc)
+	} else {
+		err = engine.ConvertWithBytes(ctx, inputPath, outputPath, options, progressFunc, byteFunc)
+	}
+
+	if ctx.Err() == context.Canceled {
+		entry.mu.Lock()
+		entry.status.Status = statusToString(StatusCancelled)
+		entry.mu.Unlock()
+		if progressCallback != nil {
+			progressCallback(id, 0, 0, 0, StatusCancelled, "")
+		}
+		return
+	}
+
+	if err != nil {
+		entry.mu.Lock()
+		entry.status.Status = statusToString(StatusFailed)
+		entry.status.Error = err.Error()
+		entry.mu.Unlock()
+		if progressCallback != nil {
+			progressCallback(id, 0, 0, 0, StatusFailed, err.Error())
+		}
+		return
+	}
+
+	entry.mu.Lock()
+	entry.status.Status = statusToString(StatusCompleted)
+	entry.status.Progress = 1.0
+	pb := entry.status.ProcessedBytes
+	tb := entry.status.TotalBytes
+	entry.mu.Unlock()
+	if progressCallback != nil {
+		progressCallback(id, 1.0, pb, tb, StatusCompleted, "")
+	}
+}
+
+func (c *Converter) executeMediaOperation(id uintptr, options models.MediaOperationOptions, progressCallback func(uintptr, float64, int64, int64, int, string), entry *conversionEntry) {
+	ctx, cancel := context.WithCancel(context.Background())
+	entry.mu.Lock()
+	entry.cancel = cancel
+	entry.status.Status = statusToString(StatusProcessing)
+	entry.mu.Unlock()
+
+	progressFunc := func(progress float64) {
+		entry.mu.Lock()
+		entry.status.Progress = progress
+		entry.mu.Unlock()
+	}
+
+	byteFunc := func(processed, total int64) {
+		entry.mu.Lock()
+		entry.status.ProcessedBytes = processed
+		entry.status.TotalBytes = total
+		p := entry.status.Progress
+		entry.mu.Unlock()
+		if progressCallback != nil {
+			progressCallback(id, p, processed, total, StatusProcessing, "")
+		}
+	}
+
+	infoFunc := func(info models.ConversionExecutionInfo) {
+		entry.mu.Lock()
+		entry.status.Mode = info.Mode
+		entry.status.VideoEncoder = info.VideoEncoder
+		entry.status.ProbeWarning = info.ProbeWarning
+		if info.OutputPath != "" {
+			entry.status.OutputPath = info.OutputPath
+		}
+		entry.mu.Unlock()
+	}
+
+	err := c.ffmpeg.RunMediaOperation(ctx, options, progressFunc, byteFunc, infoFunc)
 
 	if ctx.Err() == context.Canceled {
 		entry.mu.Lock()

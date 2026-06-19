@@ -93,6 +93,7 @@ extern char* getVersion(void);
 extern char* getSupportedFormats(void);
 extern char* detectFormat(char* filePath);
 extern long long int convertFile(char* inputPath, char* outputPath, char* optionsJSON, void* callback);
+extern long long int runMediaOperation(char* optionsJSON, void* callback);
 extern char* getConversionStatus(long long int conversionID);
 extern int cancelConversion(long long int conversionID);
 extern void freeString(char* str);

@@ -39,6 +39,7 @@ flutter:
   assets:
     - windows/runner/resources/finished.svg
     - windows/runner/resources/cancel.svg
+    - windows/runner/resources/close.svg
 
 msix_config:
   display_name: Format Converter

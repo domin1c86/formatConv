@@ -4,6 +4,7 @@ import 'package:ffi/ffi.dart';
 import '../models/conversion_options.dart';
 import '../models/format_info.dart';
 import '../models/conversion_status.dart';
+import '../models/media_operation_options.dart';
 import '../utils/ffi_helper.dart';
 
 typedef _ProgressCallbackNative = Void Function(
@@ -84,6 +85,47 @@ class ConversionService {
 
     calloc.free(inputPtr);
     calloc.free(outputPtr);
+    calloc.free(optionsPtr);
+
+    if (nativeCallable != null && result > 0) {
+      _activeCallbacks[result] = nativeCallable;
+    } else {
+      nativeCallable?.close();
+    }
+
+    return result;
+  }
+
+  Future<int> runMediaOperation(
+    MediaOperationOptions options,
+    Function(int id, double progress, int processed, int total, int status,
+            String? error)?
+        onProgress,
+  ) async {
+    final optionsPtr = jsonEncode(options.toJson()).toNativeUtf8();
+
+    Pointer<Void> callbackPtr = nullptr;
+    NativeCallable<_ProgressCallbackNative>? nativeCallable;
+
+    if (onProgress != null) {
+      nativeCallable = NativeCallable<_ProgressCallbackNative>.listener(
+        (int id, double progress, int processed, int total, int status,
+            Pointer<Utf8> error) {
+          String? errorStr;
+          if (error != nullptr) {
+            try {
+              errorStr = error.toDartString();
+            } catch (_) {
+              errorStr = 'Unknown error';
+            }
+          }
+          onProgress(id, progress, processed, total, status, errorStr);
+        },
+      );
+      callbackPtr = nativeCallable.nativeFunction.cast<Void>();
+    }
+
+    final result = FFIHelper.runMediaOperation(optionsPtr, callbackPtr);
     calloc.free(optionsPtr);
 
     if (nativeCallable != null && result > 0) {
