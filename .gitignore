@@ -46,3 +46,4 @@ third_party/tools/windows/
 dist/
 test_files/
 .claude/
+run_to_build_exe.ps1
